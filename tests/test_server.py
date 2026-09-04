@@ -57,12 +57,26 @@ def test_index_is_served(panel: str) -> None:
     assert "<title>Codriver</title>" in body
 
 
-def test_state_lists_all_six_tabs_with_three_placeholders(panel: str) -> None:
+def test_state_lists_the_five_tabs_with_one_placeholder(panel: str) -> None:
     state = _get(panel + "/api/state")
     assert [t["id"] for t in state["tabs"]] == [t["id"] for t in TABS]
-    assert len(state["tabs"]) == 6
+    assert len(state["tabs"]) == 5
     placeholders = [t["id"] for t in state["tabs"] if t["kind"] == "placeholder"]
-    assert placeholders == ["map", "prediction", "planning"]
+    assert placeholders == ["custom"]
+
+
+def test_custom_tab_carries_its_three_sections(panel: str) -> None:
+    # Map, prediction and planning are sections of one tab now, not three tabs.
+    state = _get(panel + "/api/state")
+    assert [s["id"] for s in state["custom_sections"]] == ["map", "prediction", "planning"]
+
+
+def test_the_visualiser_is_grouped_with_monitoring(panel: str) -> None:
+    # RViz moved off the recording tab, but the two still share an exclusive
+    # group, so the rail pips have to follow it to its new home.
+    state = _get(panel + "/api/state")
+    assert state["groups"]["monitoring"] == ["rviz"]
+    assert state["groups"]["recording"] == ["recording"]
 
 
 def test_state_carries_the_three_sensor_blocks(panel: str) -> None:
@@ -121,7 +135,7 @@ def test_a_missing_note_file_is_a_normal_answer(panel: str, tmp_path: Any) -> No
 
     base = default_config()
     app = App(Config(base.sensors, [], [], instructions_dir=str(empty)))
-    missing = app.document("planning")
+    missing = app.document("custom")
     assert missing["exists"] is False
     assert "No notes yet" in missing["text"]
 

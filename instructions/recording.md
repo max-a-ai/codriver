@@ -1,4 +1,4 @@
-# Recording / RViz
+# Recording
 
 Set the switches first, then press start. The switches lock once the recorder is
 running, and the selected topics are what the recording script receives.

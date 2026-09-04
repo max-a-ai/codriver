@@ -47,20 +47,28 @@ takes whatever is left. The screen in the car is portrait, so narrowing the
 window only ever shrinks the tab you are working in, and the tab labels and
 notes buttons never reflow.
 
-The left rail is six vertical tabs, 160 px wide. The right rail is 76 px, split
-into the same six rows, one notes button per row, each opening that tab's note
+The left rail is five vertical tabs, 160 px wide. The right rail is 76 px, split
+into the same five rows, one notes button per row, each opening that tab's note
 from `instructions/`. The centre is never split and always shows the tab you
 picked. Status is what opens first. Each tab carries its own summary lights in
 the rail, so the rail alone answers "is anything wrong".
 
+A burger button at the top left opens the menu: which visualiser the Monitoring
+tab should use, and stubs for the model, speech and retrieval settings that the
+language work will need.
+
 ### Status
 
-Four boxes stacked down the page: the GNSS, the eight cameras, the seven lidars,
-and the lidar operating-mode scripts. GNSS goes first because it is the one that
-comes up wrong. Green means the topic is being published at the rate it should
-be. Red means it is absent, silent, or off rate. Three sensors are listed but
-marked optional, and their failing does not turn their box red: the front-centre
-fisheye, which is never recorded, and the two bumper lidars.
+The GNSS, the eight cameras, the seven lidars, and the lidar operating-mode
+scripts, flowing into as many columns as the window fits. GNSS goes first
+because it is the one that comes up wrong. Green means the topic is being
+published at the rate it should be. Red means it is absent, silent, or off rate.
+Three sensors are listed but marked optional, and their failing does not turn
+their box red: the front-centre fisheye, which is never recorded, and the two
+bumper lidars.
+
+A block longer than ten sensors splits into two columns of its own rather than
+running off the bottom of the screen.
 
 | group | sensors | expected |
 |---|---|---|
@@ -81,14 +89,33 @@ holds for the rest of the session. There is exactly one moment where it is
 wrong, right at the start, and that is the moment nobody is looking. Open the
 panel after a restart and the top box answers it.
 
-### Recording / RViz
+### Monitoring
+
+![The Monitoring tab: per-sensor controls above, the visualisation pane below](docs/img/monitoring.png)
+
+Status tells you something is wrong; this is where you do something about it.
+Every sensor gets a row with its live rate and three controls — start, stop,
+visualise.
+
+Those three are **disabled on purpose**. The panel can read a sensor's rate, but
+it has no per-sensor driver control yet and nothing to render a single topic
+into. The row is here so the layout is settled before the wiring exists, and the
+buttons say so on hover rather than looking live and doing nothing.
+
+The lower half is where RViz or Foxglove will be embedded. Until then the
+visualiser opens in its own window, started from the button above the pane.
+Which of the two you get is a setting in the burger menu.
+
+### Recording
 
 ![The Recording tab: per-sensor switches and the topic count for the next bag](docs/img/recording.png)
 
-Split 70 / 30, recording on top. Starting one greys out the other, because the
-car can record or visualise, not both. Recording and inference are free to run
-together. Stop is a real Ctrl-C: SIGINT to the child's process group, so a bag
-closes cleanly instead of being truncated.
+The visualiser used to share this tab; it moved to Monitoring, and recording now
+has the screen to itself. The two still share an exclusive group in the backend,
+because the car can record or visualise but not both, so each says why the other
+is unavailable. Recording and inference are free to run together. Stop is a real
+Ctrl-C: SIGINT to the child's process group, so a bag closes cleanly instead of
+being truncated.
 
 The recording half carries a switch per sensor, light blue when it is going into
 the bag and greyed back when it is not. Three rules it encodes:
@@ -130,10 +157,12 @@ started, orange while initializing, green when running, red when it crashed.
 Pose inference is the reason orange exists: it spends most of a minute loading a
 checkpoint, and a green light during that window would be a lie.
 
-**Map, Prediction, Planning** are placeholders. Clicking one says so. Mapping
-started as a fourth perception signal and became its own tab, because it is a
-separate person's work rather than a stage of this pipeline. That leaves
-perception at three.
+**Custom functionalities** holds map, prediction and planning, one section each.
+They were three separate tabs, which cost three rows of the left rail and told
+you nothing the first one did not. All three are somebody else's work; if one
+grows past a section it gets its own tab back. Mapping started as a fourth
+perception signal and moved out because it is a separate person's work rather
+than a stage of this pipeline, which is what leaves perception at three.
 
 ## Running it on the car
 
@@ -265,12 +294,18 @@ it. `ruff` and `mypy --strict` are clean.
 
 Done:
 
-- [x] three-column shell, six vertical tabs, right rail split to match
-- [x] status tab: cameras, lidar, GNSS, operating-mode command buttons
-- [x] recording and RViz, split 70 / 30, mutually exclusive, stop is a real Ctrl-C
+- [x] three-column shell, five vertical tabs, right rail split to match
+- [x] status tab: cameras, lidar, GNSS, operating-mode command buttons, laid
+      out in columns so nothing is below the fold
+- [x] monitoring tab: per-sensor rows with start / stop / visualise, and the
+      pane the visualiser will be embedded into
+- [x] recording on its own tab, still mutually exclusive with the visualiser,
+      stop is a real Ctrl-C
 - [x] per-sensor recording switches, group switches, topics passed to the script
 - [x] perception tab: three pipelines, four-state lights
-- [x] map, prediction and planning placeholders
+- [x] map, prediction and planning as sections of one tab
+- [x] burger menu: visualiser choice, and stubs for model, speech, retrieval
+      and "configure new vehicle"
 - [x] four rate backends including the live rclpy probe
 - [x] config file for topics, scripts and launch commands
 - [x] per-tab notes in `instructions/`, loaded from the repo
@@ -292,14 +327,14 @@ codebases that drive it through the same commands a human can click.
 
 **The panel**
 
-- [ ] a **Monitoring** tab: per-sensor start / stop / restart, the way a
-      container dashboard gives you one control per service, with live frequency
-      and a small visualisation pane at the bottom
-- [ ] make **Status** strictly non-interactive, with an error terminal along the
-      bottom, and a column break after ten sensors instead of one long list
+- [x] a **Monitoring** tab: one control per sensor, the way a container
+      dashboard gives you one per service, with a visualisation pane below
+- [ ] wire those per-sensor buttons to real per-sensor start / stop / restart
 - [ ] embedded visualisation — evaluate Foxglove (streaming to a bridge, then
       subscribing and decoding) against RViz (direct subscription, no
       intermediate hop) and find out where the latency actually comes from
+- [ ] make **Status** strictly non-interactive: move the operating-mode buttons
+      to Monitoring and put an error terminal along the bottom
 - [ ] a bigger, red, unmistakable record button
 - [ ] a legend for what the colours mean
 - [ ] a terminal view
@@ -327,6 +362,8 @@ codebases that drive it through the same commands a human can click.
 **Further out**
 
 - [ ] adapt to a different sensor setup automatically: read a rosbag's metadata,
-      and have the model emit the panel config as a structured output
+      and have the model emit the panel config as a structured output. The drop
+      zone for it is already in the menu, under "Configure new vehicle"; it
+      reports the file it was given and does nothing else yet.
 
 The full plan and every open question is in [PROJECT_PLAN.md](PROJECT_PLAN.md).

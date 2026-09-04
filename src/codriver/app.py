@@ -20,19 +20,32 @@ from .recording import RecordingSelection
 from .ros import resolve_backend
 from .sensors import SensorMonitor
 
-#: Tabs the UI shows. The last three are deliberately empty: perception is the
-#: part being built, and map, prediction and planning are somebody else's.
+#: Tabs the UI shows.
+#:
+#: Status answers "is anything wrong" and nothing else. Monitoring is where a
+#: sensor is started, stopped or put on screen. Recording is its own tab now
+#: that the visualiser lives under Monitoring. Map, prediction and planning are
+#: somebody else's work, so they share one tab with a section each rather than
+#: taking three rows of the rail for three empty screens.
 TABS: list[dict[str, str]] = [
     {"id": "status", "label": "Status", "kind": "live"},
-    {"id": "recording", "label": "Recording / RViz", "kind": "live"},
+    {"id": "monitoring", "label": "Monitoring", "kind": "live"},
+    {"id": "recording", "label": "Recording", "kind": "live"},
     {"id": "perception", "label": "Perception", "kind": "live"},
-    {"id": "map", "label": "Map", "kind": "placeholder"},
-    {"id": "prediction", "label": "Prediction", "kind": "placeholder"},
-    {"id": "planning", "label": "Planning", "kind": "placeholder"},
+    {"id": "custom", "label": "Custom functionalities", "kind": "placeholder"},
+]
+
+#: The sections inside the "custom functionalities" tab. Each is a placeholder
+#: with its own heading, so the shape of the eventual screen is already visible.
+CUSTOM_SECTIONS: list[dict[str, str]] = [
+    {"id": "map", "label": "Map"},
+    {"id": "prediction", "label": "Prediction"},
+    {"id": "planning", "label": "Planning"},
 ]
 
 #: Which managed processes belong to which tab.
-RECORDING_PROCESSES = ("recording", "rviz")
+RECORDING_PROCESSES = ("recording",)
+MONITORING_PROCESSES = ("rviz",)
 PERCEPTION_PROCESSES = ("preprocessing", "detection", "pose")
 
 #: The process whose argv is built from the recording tab's switches.
@@ -94,8 +107,10 @@ class App:
             "command_results": results,
             "groups": {
                 "recording": list(RECORDING_PROCESSES),
+                "monitoring": list(MONITORING_PROCESSES),
                 "perception": list(PERCEPTION_PROCESSES),
             },
+            "custom_sections": CUSTOM_SECTIONS,
             "recordings_dir": self.config.recordings_dir,
             "instructions_dir": self.config.instructions_dir,
         }

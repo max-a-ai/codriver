@@ -106,14 +106,17 @@
     grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
     gap: 10px;
   }
+  /* Rows are equal-height and derived from however many tabs there are, so
+     adding or merging a tab needs no change here and the two rails stay in
+     step with each other. */
   .rail {
-    display: grid;
-    grid-template-rows: repeat(6, 1fr);
+    display: flex; flex-direction: column;
     background: var(--bg-panel-alt);
     border: 0.5px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
   }
+  .rail > * { flex: 1 1 0; min-height: 0; }
 
   /* left rail: the tabs. Narrow, so labels wrap rather than being clipped. */
   .tab {
@@ -159,13 +162,22 @@
   .title { font-size: 25.5px; font-weight: 500; }
   .hint { font-size: 18px; color: var(--text-muted); }
 
-  /* status tab: one column, boxes stacked. The car screen is portrait, so
-     side-by-side boxes would each be too narrow to read a sensor name in.
-     Order is GNSS, cameras, lidar, then the operating-mode buttons. */
-  .status-grid {
-    display: grid; grid-template-columns: 1fr; gap: 12px;
-    align-items: start;
-  }
+  /* Status: boxes flow into as many columns as fit. One long column meant the
+     lidar block was below the fold on every screen, and the thing this tab
+     exists for is being readable at a glance without scrolling. The minimum
+     column width is what a sensor name needs, so the portrait screen in the
+     car collapses back to a single column on its own.
+
+     Multi-column rather than a grid: the blocks are wildly different heights,
+     and a grid would leave a column's worth of dead space under the one-row
+     GNSS box. Columns pack instead of aligning. */
+  .status-grid { columns: 2 360px; column-gap: 12px; }
+  .status-grid > * { break-inside: avoid; margin-bottom: 12px; }
+  /* Past ten sensors a block splits its own rows into two columns rather than
+     running off the bottom of the screen. */
+  .rows.two-col { display: grid; grid-template-columns: 1fr 1fr; }
+  .rows.two-col .row { border-right: 0.5px solid var(--border); }
+  .rows.two-col .row:nth-child(2n) { border-right: none; }
   .block {
     border: 0.5px solid var(--border); border-radius: var(--radius);
     background: var(--bg-panel-alt); overflow: hidden;
@@ -227,6 +239,9 @@
   /* Recording over RViz, 70 / 30. Recording carries the whole topic selector
      and is where the time goes; RViz is two buttons. */
   .split { display: grid; grid-template-rows: 7fr 3fr; gap: 12px; height: 100%; min-height: 640px; }
+  /* Recording is alone on its tab now that the visualiser lives under
+     Monitoring, so it takes the whole height. */
+  .split.single { grid-template-rows: minmax(0, 1fr); }
   .panel {
     border: 0.5px solid var(--border); border-radius: var(--radius);
     background: var(--bg-panel-alt); padding: 14px 16px;
@@ -316,16 +331,107 @@
     font-family: var(--font-mono); font-size: 18px; white-space: pre-wrap;
     color: var(--text-secondary);
   }
+
+  /* icon buttons. Monochrome line icons inheriting currentColor, so they need
+     no second asset for the light theme. */
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; padding: 0; flex: none;
+  }
+  .icon-btn svg { width: 19px; height: 19px; display: block; }
+  .header .lead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  /* Monitoring: sensors on top, the visualisation pane filling the bottom
+     half. The pane is empty on purpose until RViz or Foxglove is embedded. */
+  .mon { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; height: 100%; min-height: 620px; }
+  /* The panel is a flex column with a bounded height, so without this the
+     blocks shrink below their own content and `overflow: hidden` eats the
+     sensor rows. Let them keep their height and let the panel scroll. */
+  .mon .block { flex: none; }
+  .ctl-row {
+    display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto;
+    align-items: center; gap: 10px;
+    padding: 6px 12px; border-bottom: 0.5px solid var(--border);
+  }
+  .ctl-row:last-child { border-bottom: none; }
+  .ctl-row .hz { font-family: var(--font-mono); font-size: 17px; color: var(--text-secondary); white-space: nowrap; }
+  .ctl-row .hz.off { color: var(--bad); }
+  .icon-row { display: flex; gap: 6px; }
+  .icon-row .icon-btn { width: 30px; height: 30px; }
+  .icon-row .icon-btn svg { width: 16px; height: 16px; }
+  .viz-pane {
+    border: 1px dashed var(--border); border-radius: var(--radius);
+    background: var(--bg-page); color: var(--text-muted);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; text-align: center; padding: 16px; min-height: 180px;
+  }
+  .viz-pane .big { font-size: 21px; color: var(--text-secondary); }
+
+  /* the "custom functionalities" tab: one card per borrowed section */
+  .sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+  .section-card {
+    border: 0.5px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-panel-alt); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 6px; min-height: 190px;
+  }
+  .section-card .label { font-size: 21px; font-weight: 500; }
+  .section-card .why { font-size: 17px; color: var(--text-muted); }
+
+  /* the burger drawer */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 15; }
+  .scrim[hidden], .drawer[hidden] { display: none; }
+  .drawer {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 16;
+    width: min(400px, 88vw);
+    background: var(--bg-panel); border-right: 0.5px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .drawer-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+  .drawer-head .label { font-size: 21px; font-weight: 500; }
+  .drawer-head button { margin-left: auto; }
+  .drawer-body { overflow-y: auto; }
+  .drawer-sec { padding: 14px 16px; border-bottom: 0.5px solid var(--border); }
+  .drawer-sec:last-child { border-bottom: none; }
+  .drawer-sec h4 { font-size: 19.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .drawer-sec .why { font-size: 16.5px; color: var(--text-muted); margin-bottom: 10px; }
+  /* Everything behind the burger except the display settings is a stub. The
+     badge says so rather than letting a dead control look live. */
+  .tmpl {
+    font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-muted); border: 0.5px solid var(--border);
+    border-radius: 3px; padding: 0 4px; font-weight: 400;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field > span { font-size: 16.5px; color: var(--text-muted); }
+  .field select, .field input[type="text"] {
+    font: inherit; font-size: 18px; padding: 5px 8px;
+    border-radius: var(--radius); border: 0.5px solid var(--border);
+    background: var(--bg-panel-alt); color: var(--text-primary); width: 100%;
+  }
+  .field select:disabled, .field input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .choice { display: flex; gap: 8px; flex-wrap: wrap; }
+  .choice button { font-size: 18px; }
+  .choice button.on { background: var(--on-tint); border-color: var(--accent); color: var(--text-primary); }
+  .dropzone {
+    border: 1px dashed var(--border); border-radius: var(--radius);
+    padding: 18px 12px; text-align: center;
+    color: var(--text-muted); font-size: 16.5px; cursor: pointer;
+  }
+  .dropzone.over { border-color: var(--accent); color: var(--text-primary); background: var(--on-tint-weak); }
+  .kv { font-family: var(--font-mono); font-size: 16.5px; color: var(--text-secondary); }
 </style>
 </head>
 <body>
 
 <header class="header">
-  <div class="brand">Codriver</div>
+  <div class="lead">
+    <button class="icon-btn" id="menu-btn" title="Menu" aria-label="Open menu" aria-expanded="false"></button>
+    <div class="brand">Codriver</div>
+  </div>
   <div class="meta">
     <span class="badge" id="backend-badge">rates: ...</span>
     <span class="badge" id="link-badge">connecting</span>
-    <button id="theme-btn" title="Switch theme">theme</button>
+    <button class="icon-btn" id="theme-btn" title="Switch theme" aria-label="Switch theme"></button>
   </div>
 </header>
 
@@ -334,6 +440,15 @@
   <main class="stage" id="stage"></main>
   <aside class="rail rail-right" id="rail-right" aria-label="Notes"></aside>
 </div>
+
+<div class="scrim" id="drawer-scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Settings">
+  <div class="drawer-head">
+    <span class="label">Menu</span>
+    <button id="drawer-close">close</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
 
 <div class="overlay" id="overlay" hidden>
   <div class="modal">
@@ -352,6 +467,10 @@
 
 const POLL_MS = 1000;
 
+// Past this many sensors a status block splits into two columns instead of
+// running off the bottom of the screen.
+const COLUMN_BREAK = 10;
+
 const ui = {
   tab: localStorage.getItem("codriver.tab") || "status",
   data: null,
@@ -361,13 +480,42 @@ const ui = {
   // reads as a panel that ignored the click.
   pending: new Set(),
   modal: null,
+  drawer: false,
 };
 
-const PLACEHOLDER_TEXT = {
-  map: "Mapping is not part of this panel yet. The tab is here so the layout is final.",
-  prediction: "Prediction is not part of this panel yet. The tab is here so the layout is final.",
-  planning: "Planning is not part of this panel yet. The tab is here so the layout is final.",
+// Preferences that belong to whoever is sitting in front of this screen rather
+// than to the car, so they live in the browser and not in config.json.
+const settings = {
+  viz: localStorage.getItem("codriver.viz") || "rviz",
 };
+
+function setSetting(key, value) {
+  settings[key] = value;
+  localStorage.setItem(`codriver.${key}`, value);
+}
+
+const PLACEHOLDER_TEXT = {
+  map: "Mapping is somebody else's work. The section is here so the layout is final.",
+  prediction: "Prediction is not part of this panel yet.",
+  planning: "Planning is not part of this panel yet.",
+  custom: "Three sections that belong to other people's work. Each gets its own view here once there is something to show.",
+};
+
+// Monochrome line icons, 24x24, stroked with currentColor so one copy serves
+// both themes.
+const ICON = {
+  menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+  sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/>',
+  moon: '<path d="M20 13.5A8.2 8.2 0 1 1 10.5 4a6.6 6.6 0 0 0 9.5 9.5z"/>',
+  play: '<path d="M8 5.5v13l10-6.5z"/>',
+  stop: '<rect x="7" y="7" width="10" height="10" rx="1.4"/>',
+  eye: '<path d="M1.8 12S5.5 5.5 12 5.5 22.2 12 22.2 12 18.5 18.5 12 18.5 1.8 12 1.8 12z"/><circle cx="12" cy="12" r="3"/>',
+};
+
+function icon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
+}
 
 function esc(value) {
   return String(value === null || value === undefined ? "" : value)
@@ -414,11 +562,10 @@ function tabPips(tab) {
 function renderRails() {
   const tabs = ui.data ? ui.data.tabs : [
     { id: "status", label: "Status", kind: "live" },
-    { id: "recording", label: "Recording / RViz", kind: "live" },
+    { id: "monitoring", label: "Monitoring", kind: "live" },
+    { id: "recording", label: "Recording", kind: "live" },
     { id: "perception", label: "Perception", kind: "live" },
-    { id: "map", label: "Map", kind: "placeholder" },
-    { id: "prediction", label: "Prediction", kind: "placeholder" },
-    { id: "planning", label: "Planning", kind: "placeholder" },
+    { id: "custom", label: "Custom functionalities", kind: "placeholder" },
   ];
 
   document.getElementById("rail-left").innerHTML = tabs.map((tab) => `
@@ -458,6 +605,9 @@ function sensorRow(sensor) {
 }
 
 function blockHtml(block) {
+  // A block longer than the column break reads better as two shorter columns
+  // than as one list you have to scroll.
+  const wide = block.sensors.length > COLUMN_BREAK ? "two-col" : "";
   return `
     <section class="block">
       <div class="block-head">
@@ -465,7 +615,7 @@ function blockHtml(block) {
         <span class="label">${esc(block.label)}</span>
         <span class="tally">${block.ok_count}/${block.required_count} required ok</span>
       </div>
-      <div class="rows">${block.sensors.map(sensorRow).join("")}</div>
+      <div class="rows ${wide}">${block.sensors.map(sensorRow).join("")}</div>
     </section>`;
 }
 
@@ -519,7 +669,88 @@ function renderStatus() {
     </div>`;
 }
 
-// --- rendering: recording / rviz -------------------------------------------
+// --- rendering: monitoring --------------------------------------------------
+
+// One sensor, with the three controls it will eventually have. They are inert
+// for now: the panel can see a sensor's rate but has no per-sensor driver to
+// start or stop, and nothing to render a single topic into yet. Showing them
+// disabled fixes the shape of the row before the wiring exists.
+function monitorRow(sensor) {
+  const hz = sensor.hz === null || sensor.hz === undefined ? "--" : sensor.hz.toFixed(1);
+  const off = sensor.state === "bad" ? "off" : "";
+  const btn = (name, label) => `
+    <button class="icon-btn" disabled title="${esc(label)} ${esc(sensor.name)} (not wired up yet)"
+            aria-label="${esc(label)} ${esc(sensor.name)}">${icon(name)}</button>`;
+  return `
+    <div class="ctl-row">
+      <span class="light ${esc(sensor.state)}"></span>
+      <span class="sensor-name">${esc(sensor.name)}</span>
+      <span class="hz ${off}">${hz} / ${sensor.expected_hz.toFixed(0)} Hz</span>
+      <span class="icon-row">${btn("play", "start")}${btn("stop", "stop")}${btn("eye", "visualise")}</span>
+    </div>`;
+}
+
+function renderMonitoring() {
+  const sensors = ui.data.sensors;
+  const rviz = processByName("rviz");
+  const blocks = sensors.blocks.map((block) => `
+    <section class="block">
+      <div class="block-head">
+        <span class="light big ${esc(block.state)}"></span>
+        <span class="label">${esc(block.label)}</span>
+        <span class="tally">${block.ok_count}/${block.required_count} required ok</span>
+      </div>
+      <div class="rows">${block.sensors.map(monitorRow).join("")}</div>
+    </section>`).join("");
+
+  const source = settings.viz === "foxglove" ? "Foxglove" : "RViz";
+  // RViz still shares an exclusive group with the recorder on the backend, so
+  // the button has to say why it is unavailable rather than just failing.
+  const recording = processByName("recording");
+  const blocked = isUp(recording);
+  const up = isUp(rviz);
+  const vizControls = rviz ? `
+    <div class="controls">
+      <button class="primary" data-action="start" data-process="rviz"
+              ${up || blocked || busy("rviz") ? "disabled" : ""}>start ${esc(rviz.label)}</button>
+      <button class="danger" data-action="stop" data-process="rviz"
+              ${!up || busy("rviz") ? "disabled" : ""}>stop</button>
+      <button data-action="log" data-process="rviz">log</button>
+    </div>
+    ${blocked ? '<div class="note">Disabled while the recorder is running. The car can record or visualise, not both.</div>' : ""}` : "";
+
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">Monitoring</div>
+        <div class="title">Sensors and visualisation</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="hint">per-sensor control is not wired up yet</span>
+        <button data-action="refresh" ${sensors.sweeping ? "disabled" : ""}>
+          ${sensors.sweeping ? "checking..." : "check now"}
+        </button>
+      </div>
+    </div>
+    <div class="mon">
+      <div class="panel">${blocks}</div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="light big ${esc(rviz ? rviz.state : "unknown")}"></span>
+          <span class="label">Visualisation</span>
+          <span class="state">${esc(source)}</span>
+        </div>
+        ${vizControls}
+        <div class="viz-pane">
+          <div class="big">${esc(source)} renders here</div>
+          <div>Nothing is embedded yet. ${esc(source)} opens in its own window for now.</div>
+          <div>Change the source under the menu, in Display.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// --- rendering: recording ---------------------------------------------------
 
 function isUp(proc) { return proc && (proc.state === "running" || proc.state === "initializing"); }
 
@@ -587,30 +818,30 @@ function topicSelector() {
 
 function renderRecording() {
   const recording = processByName("recording");
-  const rviz = processByName("rviz");
-  if (!recording || !rviz) {
-    return `<div class="empty"><div class="big">Recording and RViz are not configured</div>
-            <div>Add processes named "recording" and "rviz" to the config file.</div></div>`;
+  if (!recording) {
+    return `<div class="empty"><div class="big">Recording is not configured</div>
+            <div>Add a process named "recording" to the config file.</div></div>`;
   }
+  // The visualiser moved to Monitoring, but it still shares an exclusive group
+  // with the recorder, so this tab has to keep saying so.
+  const rviz = processByName("rviz");
   const recordingUp = isUp(recording);
   const selection = ui.data.recording || { topics: [] };
-  const recordingExtra = `
+  const extra = `
     <div class="note">${recordingUp ? "Recording now. Stop sends Ctrl-C so the bag closes cleanly." : "Not recording."}</div>
     ${topicSelector()}
     <div>Bags are written to <span class="path">${esc(ui.data.recordings_dir)}</span></div>`;
-  const rvizExtra = `<div class="note">Stop sends Ctrl-C to the RViz process group.</div>`;
 
   return `
     <div class="stage-head">
       <div>
-        <div class="kicker">Recording / Visualisation</div>
-        <div class="title">One at a time</div>
+        <div class="kicker">Recording</div>
+        <div class="title">What goes into the next bag</div>
       </div>
-      <span class="hint">recording and inference can run together; recording and RViz cannot</span>
+      <span class="hint">recording and inference can run together; recording and the visualiser cannot</span>
     </div>
-    <div class="split">
-      ${recordingPanel(recording, rviz, recordingExtra, selection.topics.length === 0)}
-      ${recordingPanel(rviz, recording, rvizExtra, false)}
+    <div class="split single">
+      ${recordingPanel(recording, rviz, extra, selection.topics.length === 0)}
     </div>`;
 }
 
@@ -676,6 +907,28 @@ function renderPlaceholder(tab) {
     </div>`;
 }
 
+// Map, prediction and planning share one tab with a section each. Three empty
+// tabs cost three rows of the rail and told you nothing the first one did not.
+function renderCustom(tab) {
+  const sections = ui.data.custom_sections || [];
+  if (!sections.length) return renderPlaceholder(tab);
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">${esc(tab.label)}</div>
+        <div class="title">Map, prediction and planning</div>
+      </div>
+      <span class="hint">one section each, none of them wired up yet</span>
+    </div>
+    <div class="sections">
+      ${sections.map((s) => `
+        <section class="section-card">
+          <span class="label">${esc(s.label)}</span>
+          <span class="why">${esc(PLACEHOLDER_TEXT[s.id] || "Not part of this panel yet.")}</span>
+        </section>`).join("")}
+    </div>`;
+}
+
 function renderStage() {
   const stage = document.getElementById("stage");
   if (!ui.data) {
@@ -683,10 +936,11 @@ function renderStage() {
     return;
   }
   const tab = ui.data.tabs.find((t) => t.id === ui.tab) || ui.data.tabs[0];
-  if (tab.kind === "placeholder") { stage.innerHTML = renderPlaceholder(tab); return; }
   if (tab.id === "status") { stage.innerHTML = renderStatus(); return; }
+  if (tab.id === "monitoring") { stage.innerHTML = renderMonitoring(); return; }
   if (tab.id === "recording") { stage.innerHTML = renderRecording(); return; }
   if (tab.id === "perception") { stage.innerHTML = renderPerception(); return; }
+  if (tab.id === "custom") { stage.innerHTML = renderCustom(tab); return; }
   stage.innerHTML = renderPlaceholder(tab);
 }
 
@@ -696,12 +950,97 @@ function renderHeader() {
   link.classList.toggle("offline", !ui.online);
   const backend = document.getElementById("backend-badge");
   backend.textContent = ui.data ? `rates: ${ui.data.sensors.backend}` : "rates: ...";
+
+  document.getElementById("menu-btn").innerHTML = icon("menu");
+  // The icon shows what the click will give you, not what you are looking at:
+  // a sun in the dark theme means "make it light".
+  const dark = document.documentElement.dataset.theme !== "light";
+  const themeBtn = document.getElementById("theme-btn");
+  themeBtn.innerHTML = icon(dark ? "sun" : "moon");
+  themeBtn.title = dark ? "Switch to the light theme" : "Switch to the dark theme";
+}
+
+// --- rendering: the burger drawer -------------------------------------------
+
+// Display is real and takes effect now. Everything below it is a stub for the
+// language, speech and retrieval work, laid out so the eventual controls have
+// somewhere to go and marked so nothing reads as working when it is not.
+function renderDrawer() {
+  if (!ui.drawer) return;
+  const vizChoice = ["rviz", "foxglove"].map((v) => `
+    <button data-action="viz" data-viz="${v}" class="${settings.viz === v ? "on" : ""}">
+      ${v === "rviz" ? "RViz" : "Foxglove"}
+    </button>`).join("");
+
+  document.getElementById("drawer-body").innerHTML = `
+    <section class="drawer-sec">
+      <h4>Display</h4>
+      <div class="why">Where the Monitoring tab's lower half gets its picture from.</div>
+      <div class="field">
+        <span>Visualisation source</span>
+        <div class="choice">${vizChoice}</div>
+      </div>
+    </section>
+
+    <section class="drawer-sec">
+      <h4>Model <span class="tmpl">template</span></h4>
+      <div class="why">Which local model answers questions and drives the panel over MCP.</div>
+      <label class="field">
+        <span>Backend</span>
+        <select disabled><option>Ollama</option></select>
+      </label>
+      <label class="field">
+        <span>Model</span>
+        <select disabled><option>qwen2.5:7b</option></select>
+      </label>
+    </section>
+
+    <section class="drawer-sec">
+      <h4>Speech <span class="tmpl">template</span></h4>
+      <div class="why">Wake word and transcription for spoken commands.</div>
+      <label class="field">
+        <span>Wake word</span>
+        <input type="text" value="Codriver" disabled>
+      </label>
+      <label class="field">
+        <span>Transcription</span>
+        <select disabled><option>Whisper</option></select>
+      </label>
+    </section>
+
+    <section class="drawer-sec">
+      <h4>Knowledge <span class="tmpl">template</span></h4>
+      <div class="why">What has been loaded into the retrieval index.</div>
+      <div class="kv">no documents indexed yet</div>
+    </section>
+
+    <section class="drawer-sec">
+      <h4>Configure new vehicle <span class="tmpl">template</span></h4>
+      <div class="why">
+        Drop a rosbag <code>metadata.yaml</code> here. The topics it lists become
+        this panel's sensors, so a different car is a file rather than an edit.
+      </div>
+      <div class="dropzone" id="dropzone">Drop metadata.yaml, or click to choose</div>
+      <div class="kv" id="dropzone-out"></div>
+    </section>`;
+}
+
+function setDrawer(open) {
+  ui.drawer = open;
+  document.getElementById("drawer").hidden = !open;
+  document.getElementById("drawer-scrim").hidden = !open;
+  document.getElementById("menu-btn").setAttribute("aria-expanded", String(open));
+  if (open) renderDrawer();
 }
 
 function render() {
   renderHeader();
   renderRails();
   renderStage();
+  // Deliberately not renderDrawer(): it is redrawn when it opens and when one
+  // of its own controls changes something. Rebuilding it on every poll would
+  // throw away focus, a half-typed field and the drop zone's answer once a
+  // second.
 }
 
 // --- modal ------------------------------------------------------------------
@@ -790,18 +1129,70 @@ document.addEventListener("click", (event) => {
   }
   if (action === "log") { showLog(target.dataset.process); return; }
   if (action === "doc") { showDocument(target.dataset.tab); return; }
+  if (action === "viz") { setSetting("viz", target.dataset.viz); renderDrawer(); renderStage(); return; }
+});
+
+// --- the drawer -------------------------------------------------------------
+
+document.getElementById("menu-btn").addEventListener("click", () => setDrawer(!ui.drawer));
+document.getElementById("drawer-close").addEventListener("click", () => setDrawer(false));
+document.getElementById("drawer-scrim").addEventListener("click", () => setDrawer(false));
+
+// The drop zone is a stub: it reads the file's name and size so the interaction
+// is real, and says plainly that nothing is done with it yet.
+function describeVehicleFile(file) {
+  const out = document.getElementById("dropzone-out");
+  if (!out) return;
+  out.textContent = file
+    ? `${file.name}, ${(file.size / 1024).toFixed(1)} kB - not parsed yet`
+    : "";
+}
+
+// Missing the drop zone must not navigate the panel away to the dropped file,
+// which is what a browser does with an unhandled drop.
+document.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  const zone = event.target.closest && event.target.closest("#dropzone");
+  if (zone) zone.classList.add("over");
+});
+
+document.addEventListener("dragleave", (event) => {
+  const zone = event.target.closest && event.target.closest("#dropzone");
+  if (zone) zone.classList.remove("over");
+});
+
+document.addEventListener("drop", (event) => {
+  event.preventDefault();
+  const zone = event.target.closest && event.target.closest("#dropzone");
+  if (!zone) return;
+  zone.classList.remove("over");
+  describeVehicleFile(event.dataTransfer && event.dataTransfer.files[0]);
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest || !event.target.closest("#dropzone")) return;
+  const picker = document.createElement("input");
+  picker.type = "file";
+  picker.accept = ".yaml,.yml";
+  picker.addEventListener("change", () => describeVehicleFile(picker.files[0]));
+  picker.click();
 });
 
 document.getElementById("modal-close").addEventListener("click", closeModal);
 document.getElementById("overlay").addEventListener("click", (event) => {
   if (event.target.id === "overlay") closeModal();
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (ui.drawer) { setDrawer(false); return; }
+  closeModal();
+});
 
 document.getElementById("theme-btn").addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
   localStorage.setItem("codriver.theme", next);
+  renderHeader();
 });
 
 // --- poll -------------------------------------------------------------------
