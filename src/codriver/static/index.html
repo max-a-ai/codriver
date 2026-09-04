@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codriver</title>
+<script>
+  // Stamp the theme before first paint so a dark-mode user never sees a white
+  // flash. Everything else boots from the script at the end of the body.
+  document.documentElement.dataset.theme = localStorage.getItem("codriver.theme") || "dark";
+</script>
+<style>
+  /* Dark is the default: this panel is used in a car, often with the screen the
+     brightest thing in the cabin. The light theme is an explicit choice, so it
+     lives in an attribute rule and beats any OS preference. */
+  :root, :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg-page: #0c0a09;
+    --bg-panel: #262524;
+    --bg-panel-alt: #1c1917;
+    --border: rgba(255,255,255,0.10);
+    --text-primary: #fafaf9;
+    --text-secondary: #d6d3d1;
+    --text-muted: #78716c;
+    --accent: #38bdf8;
+    --ok: #10b981;
+    --warn: #f59e0b;
+    --bad: #f87171;
+    --idle: #60a5fa;
+    --unknown: #57534e;
+    /* The fill behind a switched-on recording toggle. Light blue rather than
+       green: it says selected, not healthy, and the two must not be confused. */
+    --on-tint: rgba(56, 189, 248, 0.20);
+    --on-tint-weak: rgba(56, 189, 248, 0.08);
+    --primary: #fafaf9;
+    --on-primary: #1c1917;
+    --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    --radius: 6px;
+    /* Both rails are sized to their contents and then stay that size. Only the
+       centre gives ground when the window narrows, which is what makes the
+       portrait screen in the car work: the tab labels and the notes buttons
+       never reflow, the tab you are looking at just gets less room. Left fits
+       "Recording /" on one line at the current font size; right fits the TXT
+       glyph over the word "notes". */
+    --rail-left: 160px;
+    --rail-right: 76px;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg-page: #f5f5f4;
+    --bg-panel: #ffffff;
+    --bg-panel-alt: #fafaf9;
+    --border: rgba(0,0,0,0.12);
+    --text-primary: #1c1917;
+    --text-secondary: #57534e;
+    --text-muted: #a8a29e;
+    --accent: #185fa5;
+    --ok: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --idle: #2563eb;
+    --unknown: #d6d3d1;
+    --on-tint: rgba(24, 95, 165, 0.14);
+    --on-tint-weak: rgba(24, 95, 165, 0.06);
+    --primary: #1c1917;
+    --on-primary: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-page); color: var(--text-primary);
+    font-size: 21px; line-height: 1.5;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  h1, h2, h3, h4 { margin: 0; font-weight: 500; }
+  button {
+    font: inherit; padding: 6px 12px; border-radius: var(--radius);
+    background: transparent; border: 0.5px solid var(--border);
+    color: var(--text-primary); cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--bg-panel-alt); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .primary { background: var(--primary); color: var(--on-primary); border: none; }
+  .primary:hover:not(:disabled) { opacity: 0.88; background: var(--primary); }
+  .danger { border-color: var(--bad); color: var(--bad); }
+
+  /* header */
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; }
+  .header .brand { font-size: 22.5px; font-weight: 500; letter-spacing: 0.2px; }
+  .header .meta { display: flex; align-items: center; gap: 8px; }
+  .badge {
+    font-size: 16.5px; font-family: var(--font-mono); padding: 3px 8px; border-radius: 999px;
+    border: 0.5px solid var(--border); color: var(--text-secondary); white-space: nowrap;
+  }
+  .badge.offline { color: var(--bad); border-color: var(--bad); }
+
+  /* Three columns. The rails are fixed at the width their contents need; the
+     centre takes whatever is left, so narrowing the window only ever shrinks
+     the tab you are working in. The two rails share one row template so the
+     right-hand buttons line up with the tabs they belong to. */
+  .shell {
+    flex: 1; min-height: 0;
+    display: grid;
+    grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+    gap: 10px;
+  }
+  .rail {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    background: var(--bg-panel-alt);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* left rail: the tabs. Narrow, so labels wrap rather than being clipped. */
+  .tab {
+    text-align: left; padding: 12px 10px;
+    background: transparent; border: none; border-radius: 0;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    display: flex; flex-direction: column; justify-content: center; gap: 6px;
+    min-width: 0; overflow-wrap: anywhere;
+  }
+  .rail .tab:last-child { border-bottom: none; }
+  .tab .name { font-size: 19.5px; line-height: 1.25; }
+  .tab.active { background: var(--bg-panel); color: var(--text-primary); }
+  .tab.active .name { font-weight: 500; }
+  .tab .sub { font-size: 16.5px; color: var(--text-muted); font-family: var(--font-mono); }
+  .tab.placeholder .name { opacity: 0.75; }
+  .tab .pips { display: flex; gap: 4px; align-items: center; }
+
+  /* right rail: one document button per tab row */
+  .doc-cell {
+    border-bottom: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rail-right .doc-cell:last-child { border-bottom: none; }
+  .doc-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    width: 100%; height: 100%; border: none; border-radius: 0; justify-content: center;
+    color: var(--text-muted);
+  }
+  .doc-btn .glyph {
+    font-family: var(--font-mono); font-size: 15px; letter-spacing: 0.5px;
+    border: 0.5px solid var(--border); border-radius: 3px; padding: 2px 4px;
+  }
+  .doc-btn .cap { font-size: 15px; }
+
+  /* centre stage */
+  .stage {
+    background: var(--bg-panel); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; overflow-y: auto; min-width: 0;
+  }
+  .stage-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .kicker { font-size: 16.5px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .title { font-size: 25.5px; font-weight: 500; }
+  .hint { font-size: 18px; color: var(--text-muted); }
+
+  /* status tab: one column, boxes stacked. The car screen is portrait, so
+     side-by-side boxes would each be too narrow to read a sensor name in.
+     Order is GNSS, cameras, lidar, then the operating-mode buttons. */
+  .status-grid {
+    display: grid; grid-template-columns: 1fr; gap: 12px;
+    align-items: start;
+  }
+  .block {
+    border: 0.5px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-panel-alt); overflow: hidden;
+  }
+  .block-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 0.5px solid var(--border);
+  }
+  .block-head .label { font-weight: 500; }
+  .block-head .tally { margin-left: auto; font-size: 16.5px; font-family: var(--font-mono); color: var(--text-muted); }
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: grid; grid-template-columns: 14px 1fr auto;
+    align-items: center; gap: 8px;
+    padding: 7px 12px; border-bottom: 0.5px solid var(--border);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .who { min-width: 0; }
+  .row .sensor-name { font-family: var(--font-mono); font-size: 18px; }
+  .row.optional .sensor-name { color: var(--text-secondary); }
+  .row .why { font-size: 16.5px; color: var(--text-muted); }
+  .row .hz { font-family: var(--font-mono); font-size: 18px; color: var(--text-secondary); white-space: nowrap; }
+  .row .hz.off { color: var(--bad); }
+  .tag {
+    font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-muted); border: 0.5px solid var(--border);
+    border-radius: 3px; padding: 0 3px; margin-left: 6px; vertical-align: 1px;
+  }
+
+  /* the lights */
+  .light {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--unknown); display: inline-block; flex: none;
+  }
+  .light.ok { background: var(--ok); }
+  .light.bad { background: var(--bad); }
+  .light.unknown { background: var(--unknown); }
+  .light.idle { background: var(--idle); }
+  .light.initializing { background: var(--warn); animation: breathe 1.4s ease-in-out infinite; }
+  .light.running { background: var(--ok); }
+  .light.crashed { background: var(--bad); }
+  .light.big { width: 14px; height: 14px; }
+  @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .light.initializing { animation: none; } }
+
+  /* command buttons */
+  .cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+  .cmd-grid button { text-align: left; padding: 8px 10px; }
+  .cmd-grid .cmd-label { display: block; font-size: 19.5px; }
+  .cmd-grid .cmd-desc { display: block; font-size: 16.5px; color: var(--text-muted); }
+  .cmd-out {
+    margin: 0 12px 12px; padding: 8px 10px; border-radius: var(--radius);
+    background: var(--bg-page); border: 0.5px solid var(--border);
+    font-family: var(--font-mono); font-size: 16.5px; white-space: pre-wrap;
+    max-height: 120px; overflow: auto;
+  }
+  .cmd-out.fail { border-color: var(--bad); }
+
+  /* Recording over RViz, 70 / 30. Recording carries the whole topic selector
+     and is where the time goes; RViz is two buttons. */
+  .split { display: grid; grid-template-rows: 7fr 3fr; gap: 12px; height: 100%; min-height: 640px; }
+  .panel {
+    border: 0.5px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-panel-alt); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    min-height: 0; overflow-y: auto;
+  }
+  /* Greying out the half that cannot run is the whole point of the split: the
+     car can record or visualise, never both. */
+  .panel.locked { opacity: 0.42; }
+  .panel.locked button { pointer-events: none; }
+  .panel-head { display: flex; align-items: center; gap: 10px; }
+  .panel-head .label { font-size: 22.5px; font-weight: 500; }
+  .panel-head .state { font-size: 18px; font-family: var(--font-mono); color: var(--text-secondary); margin-left: auto; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  .note { font-size: 18px; color: var(--text-muted); }
+  .path {
+    font-family: var(--font-mono); font-size: 16.5px; color: var(--text-secondary);
+    background: var(--bg-page); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 6px 8px; display: inline-block;
+  }
+
+  /* the topic switches on the recording panel */
+  .selector { display: flex; flex-direction: column; gap: 6px; }
+  .sel-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font-size: 18px; color: var(--text-muted);
+  }
+  .sel-head .count { font-family: var(--font-mono); color: var(--text-secondary); }
+  .sel-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sel-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .sel-sep {
+    font-size: 15px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-muted); margin-top: 6px;
+  }
+  .tgl {
+    text-align: left; padding: 5px 8px; font-size: 18px;
+    font-family: var(--font-mono); border-radius: var(--radius);
+    border: 0.5px solid var(--border); background: transparent;
+    color: var(--text-secondary); width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tgl.group { font-family: inherit; font-size: 19.5px; padding: 6px 10px; }
+  /* on = light blue and legible, off = greyed back. Both are still buttons. */
+  .tgl.on { background: var(--on-tint); border-color: var(--accent); color: var(--text-primary); }
+  .tgl.partial {
+    background: var(--on-tint-weak); border-color: var(--accent);
+    border-style: dashed; color: var(--text-primary);
+  }
+  .tgl.off { opacity: 0.42; }
+  .tgl:hover:not(:disabled) { border-color: var(--accent); }
+
+  /* perception */
+  .pipes { display: flex; flex-direction: column; gap: 10px; }
+  .pipe {
+    border: 0.5px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-panel-alt); padding: 12px 14px;
+    display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 12px;
+  }
+  .pipe .label { font-size: 21px; }
+  .pipe .why { font-size: 16.5px; color: var(--text-muted); font-family: var(--font-mono); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 16.5px; color: var(--text-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* placeholder tabs */
+  .empty {
+    height: 100%; min-height: 300px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; color: var(--text-muted); text-align: center;
+  }
+  .empty .big { font-size: 24px; color: var(--text-secondary); }
+
+  /* modal, used for logs and the instructions file */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10;
+  }
+  .overlay[hidden] { display: none; }
+  .modal {
+    background: var(--bg-panel); border: 0.5px solid var(--border); border-radius: 12px;
+    width: min(900px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  }
+  .modal-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+  .modal-head .label { font-weight: 500; }
+  .modal-head button { margin-left: auto; }
+  .modal-body {
+    padding: 12px 16px; overflow: auto;
+    font-family: var(--font-mono); font-size: 18px; white-space: pre-wrap;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="brand">Codriver</div>
+  <div class="meta">
+    <span class="badge" id="backend-badge">rates: ...</span>
+    <span class="badge" id="link-badge">connecting</span>
+    <button id="theme-btn" title="Switch theme">theme</button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail rail-left" id="rail-left" aria-label="Sections"></nav>
+  <main class="stage" id="stage"></main>
+  <aside class="rail rail-right" id="rail-right" aria-label="Notes"></aside>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <span class="label" id="modal-title"></span>
+      <button id="modal-close">close</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// --- state ------------------------------------------------------------------
+
+const POLL_MS = 1000;
+
+const ui = {
+  tab: localStorage.getItem("codriver.tab") || "status",
+  data: null,
+  online: false,
+  // Names of processes whose start/stop is in flight. The lights only tell the
+  // truth once the next poll lands, and a button that looks inert for a second
+  // reads as a panel that ignored the click.
+  pending: new Set(),
+  modal: null,
+};
+
+const PLACEHOLDER_TEXT = {
+  map: "Mapping is not part of this panel yet. The tab is here so the layout is final.",
+  prediction: "Prediction is not part of this panel yet. The tab is here so the layout is final.",
+  planning: "Planning is not part of this panel yet. The tab is here so the layout is final.",
+};
+
+function esc(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function api(path, options) {
+  const res = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, options || {}));
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).error || detail; } catch (err) { /* not JSON */ }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function processByName(name) {
+  if (!ui.data) return null;
+  return ui.data.processes.find((p) => p.name === name) || null;
+}
+
+function busy(name) { return ui.pending.has(name); }
+
+// --- rendering: rails -------------------------------------------------------
+
+function tabPips(tab) {
+  // A tab carries its own summary, so the left rail alone answers "is anything
+  // wrong" without opening every view.
+  if (!ui.data) return "";
+  if (tab.id === "status") {
+    return ui.data.sensors.blocks
+      .map((b) => `<span class="light ${esc(b.state)}" title="${esc(b.label)}"></span>`).join("");
+  }
+  const names = ui.data.groups[tab.id];
+  if (!names) return "";
+  return names.map((name) => {
+    const proc = processByName(name);
+    const state = proc ? proc.state : "unknown";
+    return `<span class="light ${esc(state)}" title="${esc(name)}"></span>`;
+  }).join("");
+}
+
+function renderRails() {
+  const tabs = ui.data ? ui.data.tabs : [
+    { id: "status", label: "Status", kind: "live" },
+    { id: "recording", label: "Recording / RViz", kind: "live" },
+    { id: "perception", label: "Perception", kind: "live" },
+    { id: "map", label: "Map", kind: "placeholder" },
+    { id: "prediction", label: "Prediction", kind: "placeholder" },
+    { id: "planning", label: "Planning", kind: "placeholder" },
+  ];
+
+  document.getElementById("rail-left").innerHTML = tabs.map((tab) => `
+    <button class="tab ${tab.id === ui.tab ? "active" : ""} ${tab.kind === "placeholder" ? "placeholder" : ""}"
+            data-action="tab" data-tab="${esc(tab.id)}">
+      <span class="name">${esc(tab.label)}</span>
+      <span class="pips">${tabPips(tab)}</span>
+      ${tab.kind === "placeholder" ? '<span class="sub">placeholder</span>' : ""}
+    </button>`).join("");
+
+  // Same six rows on the right, so every section has its notes button in line
+  // with its tab. All of them open the same file for now.
+  document.getElementById("rail-right").innerHTML = tabs.map((tab) => `
+    <div class="doc-cell">
+      <button class="doc-btn" data-action="doc" data-tab="${esc(tab.id)}"
+              title="Notes for ${esc(tab.label)}">
+        <span class="glyph">TXT</span>
+        <span class="cap">notes</span>
+      </button>
+    </div>`).join("");
+}
+
+// --- rendering: status ------------------------------------------------------
+
+function sensorRow(sensor) {
+  const hz = sensor.hz === null || sensor.hz === undefined ? "--" : sensor.hz.toFixed(1);
+  const off = sensor.state === "bad" ? "off" : "";
+  return `
+    <div class="row ${sensor.critical ? "" : "optional"}">
+      <span class="light ${esc(sensor.state)}"></span>
+      <span class="who">
+        <span class="sensor-name">${esc(sensor.name)}</span>${sensor.critical ? "" : '<span class="tag">optional</span>'}
+        ${sensor.detail ? `<div class="why">${esc(sensor.detail)}</div>` : ""}
+      </span>
+      <span class="hz ${off}">${hz} / ${sensor.expected_hz.toFixed(0)} Hz</span>
+    </div>`;
+}
+
+function blockHtml(block) {
+  return `
+    <section class="block">
+      <div class="block-head">
+        <span class="light big ${esc(block.state)}"></span>
+        <span class="label">${esc(block.label)}</span>
+        <span class="tally">${block.ok_count}/${block.required_count} required ok</span>
+      </div>
+      <div class="rows">${block.sensors.map(sensorRow).join("")}</div>
+    </section>`;
+}
+
+function commandsBlock() {
+  const results = ui.data.command_results || {};
+  const buttons = ui.data.commands.map((cmd) => `
+    <button data-action="command" data-command="${esc(cmd.name)}" ${busy(cmd.name) ? "disabled" : ""}>
+      <span class="cmd-label">${esc(busy(cmd.name) ? "running..." : cmd.label)}</span>
+      <span class="cmd-desc">${esc(cmd.description)}</span>
+    </button>`).join("");
+
+  // Only the most recent result is worth the space; the rest is in the script's
+  // own logging on the car.
+  const last = Object.values(results).sort((a, b) => (b.seconds || 0) - (a.seconds || 0))[0];
+  const shown = ui.data.commands
+    .map((c) => results[c.name])
+    .filter(Boolean)
+    .slice(-1)[0] || last;
+
+  return `
+    <section class="block">
+      <div class="block-head"><span class="label">Lidar operating mode</span></div>
+      <div class="cmd-grid">${buttons}</div>
+      ${shown ? `<div class="cmd-out ${shown.exit_code === 0 ? "" : "fail"}">${esc(shown.name)} exited ${esc(shown.exit_code)}\n${esc(shown.output)}</div>` : ""}
+    </section>`;
+}
+
+function renderStatus() {
+  const sensors = ui.data.sensors;
+  const checked = sensors.last_checked
+    ? new Date(sensors.last_checked * 1000).toLocaleTimeString()
+    : "never";
+
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">Status</div>
+        <div class="title">Sensor availability and rate</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="hint">checked ${esc(checked)} via ${esc(sensors.backend)}</span>
+        <button data-action="refresh" ${sensors.sweeping ? "disabled" : ""}>
+          ${sensors.sweeping ? "checking..." : "check now"}
+        </button>
+      </div>
+    </div>
+    ${sensors.error ? `<div class="cmd-out fail">${esc(sensors.error)}</div>` : ""}
+    <div class="status-grid">
+      ${sensors.blocks.map(blockHtml).join("")}
+      ${commandsBlock()}
+    </div>`;
+}
+
+// --- rendering: recording / rviz -------------------------------------------
+
+function isUp(proc) { return proc && (proc.state === "running" || proc.state === "initializing"); }
+
+function recordingPanel(proc, other, extra, startDisabled) {
+  // "locked" is the visual half of the exclusive group the backend enforces.
+  const locked = isUp(other);
+  const up = isUp(proc);
+  const label = proc ? proc.label : "unknown";
+  const stateText = proc ? (proc.detail ? `${proc.state} - ${proc.detail}` : proc.state) : "unknown";
+  return `
+    <section class="panel ${locked ? "locked" : ""}">
+      <div class="panel-head">
+        <span class="light big ${esc(proc ? proc.state : "unknown")}"></span>
+        <span class="label">${esc(label)}</span>
+        <span class="state">${esc(stateText)}</span>
+      </div>
+      <div class="controls">
+        <button class="primary" data-action="start" data-process="${esc(proc.name)}"
+                ${up || locked || startDisabled || busy(proc.name) ? "disabled" : ""}>start</button>
+        <button class="danger" data-action="stop" data-process="${esc(proc.name)}"
+                ${!up || busy(proc.name) ? "disabled" : ""}>stop</button>
+        <button data-action="log" data-process="${esc(proc.name)}">log</button>
+      </div>
+      ${locked ? `<div class="note">Disabled while ${esc(other.label)} is running. The car can record or visualise, not both.</div>` : ""}
+      ${extra}
+    </section>`;
+}
+
+// One switch. Groups get the plain font and a partial state; sensors get the
+// monospace name and their topic list as a tooltip.
+function toggle(item, locked, isGroup) {
+  const key = item.key || item.name;
+  const tip = (item.topics || []).join("\n");
+  return `
+    <button class="tgl ${isGroup ? "group" : ""} ${esc(item.state)}"
+            data-action="toggle" data-key="${esc(key)}"
+            ${locked || busy(key) ? "disabled" : ""}
+            title="${esc(tip)}">${esc(item.label || item.name)}</button>`;
+}
+
+function topicSelector() {
+  const sel = ui.data.recording;
+  if (!sel) return "";
+  const locked = sel.locked;
+  const columns = sel.columns.map((col) => `
+    <div class="sel-col">
+      ${col.groups.map((g) => toggle(g, locked, true)).join("")}
+      <div class="sel-sep">${esc(col.label)}</div>
+      ${col.required.map((s) => toggle(s, locked, false)).join("")}
+      ${col.optional.length ? '<div class="sel-sep">optional, off by default</div>' : ""}
+      ${col.optional.map((s) => toggle(s, locked, false)).join("")}
+    </div>`).join("");
+  const always = sel.always.flatMap((a) => a.topics).join(", ");
+  return `
+    <div class="selector">
+      <div class="sel-head">
+        <span>${locked ? "Topics are fixed while the recorder runs" : "Topics in the next bag"}</span>
+        <span class="count">${sel.topics.length} topics</span>
+      </div>
+      ${toggle(sel.all, locked, true)}
+      <div class="sel-cols">${columns}</div>
+      ${always ? `<div class="note">Always recorded: <span class="path">${esc(always)}</span></div>` : ""}
+    </div>`;
+}
+
+function renderRecording() {
+  const recording = processByName("recording");
+  const rviz = processByName("rviz");
+  if (!recording || !rviz) {
+    return `<div class="empty"><div class="big">Recording and RViz are not configured</div>
+            <div>Add processes named "recording" and "rviz" to the config file.</div></div>`;
+  }
+  const recordingUp = isUp(recording);
+  const selection = ui.data.recording || { topics: [] };
+  const recordingExtra = `
+    <div class="note">${recordingUp ? "Recording now. Stop sends Ctrl-C so the bag closes cleanly." : "Not recording."}</div>
+    ${topicSelector()}
+    <div>Bags are written to <span class="path">${esc(ui.data.recordings_dir)}</span></div>`;
+  const rvizExtra = `<div class="note">Stop sends Ctrl-C to the RViz process group.</div>`;
+
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">Recording / Visualisation</div>
+        <div class="title">One at a time</div>
+      </div>
+      <span class="hint">recording and inference can run together; recording and RViz cannot</span>
+    </div>
+    <div class="split">
+      ${recordingPanel(recording, rviz, recordingExtra, selection.topics.length === 0)}
+      ${recordingPanel(rviz, recording, rvizExtra, false)}
+    </div>`;
+}
+
+// --- rendering: perception --------------------------------------------------
+
+function pipeRow(name) {
+  const proc = processByName(name);
+  if (!proc) {
+    return `<div class="pipe"><span class="light unknown"></span>
+            <span><span class="label">${esc(name)}</span>
+            <div class="why">not in the config file</div></span><span></span></div>`;
+  }
+  const up = isUp(proc);
+  return `
+    <div class="pipe">
+      <span class="light big ${esc(proc.state)}"></span>
+      <span>
+        <span class="label">${esc(proc.label)}</span>
+        <div class="why">${esc(proc.detail || proc.state)}</div>
+      </span>
+      <span class="controls">
+        <button class="primary" data-action="start" data-process="${esc(name)}"
+                ${up || busy(name) ? "disabled" : ""}>start</button>
+        <button class="danger" data-action="stop" data-process="${esc(name)}"
+                ${!up || busy(name) ? "disabled" : ""}>stop</button>
+        <button data-action="log" data-process="${esc(name)}">log</button>
+      </span>
+    </div>`;
+}
+
+function renderPerception() {
+  const names = ui.data.groups.perception || [];
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">Perception</div>
+        <div class="title">Pipelines</div>
+      </div>
+      <span class="hint">start top to bottom; pose inference loads a checkpoint first</span>
+    </div>
+    <div class="pipes">${names.map(pipeRow).join("")}</div>
+    <div class="legend">
+      <span><i class="light idle"></i> not started</span>
+      <span><i class="light initializing"></i> initializing</span>
+      <span><i class="light running"></i> running</span>
+      <span><i class="light crashed"></i> crashed</span>
+    </div>`;
+}
+
+// --- rendering: shell -------------------------------------------------------
+
+function renderPlaceholder(tab) {
+  return `
+    <div class="stage-head">
+      <div>
+        <div class="kicker">${esc(tab.label)}</div>
+        <div class="title">Placeholder</div>
+      </div>
+    </div>
+    <div class="empty">
+      <div class="big">${esc(tab.label)} is a placeholder</div>
+      <div>${esc(PLACEHOLDER_TEXT[tab.id] || "Nothing is wired up behind this tab yet.")}</div>
+    </div>`;
+}
+
+function renderStage() {
+  const stage = document.getElementById("stage");
+  if (!ui.data) {
+    stage.innerHTML = `<div class="empty"><div class="big">Connecting to the panel backend</div></div>`;
+    return;
+  }
+  const tab = ui.data.tabs.find((t) => t.id === ui.tab) || ui.data.tabs[0];
+  if (tab.kind === "placeholder") { stage.innerHTML = renderPlaceholder(tab); return; }
+  if (tab.id === "status") { stage.innerHTML = renderStatus(); return; }
+  if (tab.id === "recording") { stage.innerHTML = renderRecording(); return; }
+  if (tab.id === "perception") { stage.innerHTML = renderPerception(); return; }
+  stage.innerHTML = renderPlaceholder(tab);
+}
+
+function renderHeader() {
+  const link = document.getElementById("link-badge");
+  link.textContent = ui.online ? "connected" : "backend offline";
+  link.classList.toggle("offline", !ui.online);
+  const backend = document.getElementById("backend-badge");
+  backend.textContent = ui.data ? `rates: ${ui.data.sensors.backend}` : "rates: ...";
+}
+
+function render() {
+  renderHeader();
+  renderRails();
+  renderStage();
+}
+
+// --- modal ------------------------------------------------------------------
+
+function openModal(title, body) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").textContent = body;
+  document.getElementById("overlay").hidden = false;
+}
+
+function closeModal() {
+  ui.modal = null;
+  document.getElementById("overlay").hidden = true;
+}
+
+async function showLog(name) {
+  ui.modal = { kind: "log", name };
+  try {
+    const payload = await api(`/api/processes/${name}/log`);
+    openModal(`${name} log`, payload.lines.join("\n") || "(nothing yet)");
+  } catch (err) {
+    openModal(`${name} log`, `could not read the log: ${err.message}`);
+  }
+}
+
+async function showDocument(tabId) {
+  ui.modal = { kind: "doc" };
+  try {
+    const payload = await api(`/api/document/${tabId}`);
+    openModal(`${payload.label} notes`, `${payload.path}\n\n${payload.text}`);
+  } catch (err) {
+    openModal("notes", `could not read the file: ${err.message}`);
+  }
+}
+
+// --- actions ----------------------------------------------------------------
+
+async function withPending(name, fn) {
+  ui.pending.add(name);
+  render();
+  try {
+    return await fn();
+  } finally {
+    ui.pending.delete(name);
+    await tick();
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  const action = target.dataset.action;
+
+  if (action === "tab") {
+    ui.tab = target.dataset.tab;
+    localStorage.setItem("codriver.tab", ui.tab);
+    render();
+    return;
+  }
+  if (action === "refresh") {
+    api("/api/sensors/refresh", { method: "POST" }).then(tick).catch(() => {});
+    return;
+  }
+  if (action === "toggle") {
+    const key = target.dataset.key;
+    // Flip the look straight away. The next poll replaces it with whatever the
+    // backend actually decided, which is the only version that matters.
+    target.classList.remove("on", "off", "partial");
+    withPending(key, () => api(`/api/recording/toggle/${key}`, { method: "POST" })
+      .then((result) => { if (result && result.ok === false) openModal("cannot change topics", result.error); }))
+      .catch((err) => openModal("request failed", err.message));
+    return;
+  }
+  if (action === "start" || action === "stop") {
+    const name = target.dataset.process;
+    withPending(name, () => api(`/api/processes/${name}/${action}`, { method: "POST" })
+      .then((result) => { if (result && result.ok === false) openModal("cannot start", result.error); }))
+      .catch((err) => openModal("request failed", err.message));
+    return;
+  }
+  if (action === "command") {
+    const name = target.dataset.command;
+    withPending(name, () => api(`/api/commands/${name}`, { method: "POST" }))
+      .catch((err) => openModal("command failed", err.message));
+    return;
+  }
+  if (action === "log") { showLog(target.dataset.process); return; }
+  if (action === "doc") { showDocument(target.dataset.tab); return; }
+});
+
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("overlay").addEventListener("click", (event) => {
+  if (event.target.id === "overlay") closeModal();
+});
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
+
+document.getElementById("theme-btn").addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("codriver.theme", next);
+});
+
+// --- poll -------------------------------------------------------------------
+
+async function tick() {
+  try {
+    ui.data = await api("/api/state");
+    ui.online = true;
+  } catch (err) {
+    ui.online = false;
+  }
+  render();
+  // An open log view should follow the process it is watching.
+  if (ui.modal && ui.modal.kind === "log") {
+    try {
+      const payload = await api(`/api/processes/${ui.modal.name}/log`);
+      document.getElementById("modal-body").textContent = payload.lines.join("\n") || "(nothing yet)";
+    } catch (err) { /* leave the last content in place */ }
+  }
+}
+
+render();
+tick();
+setInterval(tick, POLL_MS);
+</script>
+</body>
+</html>

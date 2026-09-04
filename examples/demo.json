@@ -1,0 +1,98 @@
+{
+  "ros_backend": "mock",
+  "probe_seconds": 2.0,
+  "auto_refresh_seconds": 15.0,
+  "recordings_dir": "~/recordings",
+  "processes": [
+    {
+      "name": "recording",
+      "label": "Recording",
+      "command": [
+        "examples/demo-scripts/fake_record.sh"
+      ],
+      "ready_pattern": "ready",
+      "exclusive_group": "bag_io",
+      "ready_after_seconds": 5.0
+    },
+    {
+      "name": "rviz",
+      "label": "RViz2",
+      "command": [
+        "examples/demo-scripts/fake_pipeline.sh",
+        "rviz2",
+        "3"
+      ],
+      "exclusive_group": "bag_io",
+      "ready_after_seconds": 3.0
+    },
+    {
+      "name": "preprocessing",
+      "label": "Preprocessing pipeline",
+      "command": [
+        "examples/demo-scripts/fake_pipeline.sh",
+        "preprocessing",
+        "3"
+      ],
+      "ready_after_seconds": 4.0
+    },
+    {
+      "name": "detection",
+      "label": "Detection pipeline",
+      "command": [
+        "examples/demo-scripts/fake_pipeline.sh",
+        "detection",
+        "3"
+      ],
+      "ready_after_seconds": 4.0
+    },
+    {
+      "name": "pose",
+      "label": "Pose inference pipeline",
+      "command": [
+        "examples/demo-scripts/fake_pipeline.sh",
+        "pose-inference",
+        "12"
+      ],
+      "ready_pattern": "ready",
+      "ready_after_seconds": 60.0
+    }
+  ],
+  "commands": [
+    {
+      "name": "om_normal_all",
+      "label": "All lidars: normal",
+      "command": [
+        "examples/demo-scripts/fake_om.sh",
+        "normal-all"
+      ],
+      "description": "Bring every lidar back to normal operating mode."
+    },
+    {
+      "name": "om_standby_all",
+      "label": "All lidars: standby",
+      "command": [
+        "examples/demo-scripts/fake_om.sh",
+        "standby-all"
+      ],
+      "description": "Put every lidar into standby."
+    },
+    {
+      "name": "om_normal_bumper",
+      "label": "Bumper lidars: normal",
+      "command": [
+        "examples/demo-scripts/fake_om.sh",
+        "normal-bumper"
+      ],
+      "description": "Bring the two bumper lidars back to normal operating mode."
+    },
+    {
+      "name": "om_standby_bumper",
+      "label": "Bumper lidars: standby",
+      "command": [
+        "examples/demo-scripts/fake_om.sh",
+        "standby-bumper"
+      ],
+      "description": "Put the two bumper lidars into standby."
+    }
+  ]
+}

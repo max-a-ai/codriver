@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Unpacked template, kept as a reference and rebuildable from the zip
+globalopenhack/
+
+# graphify working directory. The graph is built over the unpacked template as
+# well, which is not in this repo, so the exported graph is local-only.
+graphify-out/
+
+# Panel runtime output
+*.log
