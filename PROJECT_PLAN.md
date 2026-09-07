@@ -89,6 +89,38 @@ Ordered so that each step is testable on its own.
 - [ ] **2.5** A "check everything" button that runs the bag backend for 60
       seconds and shows the result next to the live numbers, for the times you
       want the trustworthy answer rather than the fast one.
+- [ ] **2.6** **Build the panel's sensor list from a reference rosbag.** Today
+      the sensors, their topics and their expected rates are hand-written in
+      `config.json`, which is the part that has to be redone for every vehicle
+      and the part most likely to drift from what the car actually publishes.
+
+      Instead: record one bag with every sensor on and running at the rate it
+      should, then hand the panel that bag's `metadata.yaml`. Dragging the
+      metadata file alone is enough — the bag itself is not needed, and the
+      drop zone for it already exists in the menu under "Configure new
+      vehicle".
+
+      What the panel derives from it:
+
+      - **which sensors exist**, sorted into GNSS, cameras and lidar from the
+        topic names and types
+      - **the expected rate per sensor**, as `message_count / duration` from
+        `topics_with_message_count`, **rounded to the nearest 0.5 Hz** — so a
+        measured 19.87 becomes a target of 20.0, and 10.24 becomes 10.0. Half-Hz
+        steps because sensor rates in practice land on 10, 20 and the occasional
+        12.5, and rounding harder would erase a real difference.
+      - **the topic list per sensor**, which is also what the recording
+        switches are built from
+
+      Those become the `expected_hz` each live reading is compared against, so
+      the status lights are measured against a recording that was known good
+      rather than against a number somebody typed.
+
+      The catch to design around: the reference bag has to have been healthy.
+      A bag recorded while the GNSS was still at 1 Hz would silently install
+      1.0 Hz as the target and the panel would report green forever. The import
+      should show what it derived and make somebody confirm it before it
+      replaces the running config, rather than applying it straight away.
 
 ## Phase 3: not mine, but the tabs are there
 

@@ -372,9 +372,22 @@ codebases that drive it through the same commands a human can click.
 
 **Further out**
 
-- [ ] adapt to a different sensor setup automatically: read a rosbag's metadata,
-      and have the model emit the panel config as a structured output. The drop
-      zone for it is already in the menu, under "Configure new vehicle"; it
-      reports the file it was given and does nothing else yet.
+- [ ] **build the sensor list from a reference rosbag.** Record one bag with
+      every sensor on and at the rate it should run, then drag that bag's
+      `metadata.yaml` onto the panel. The drop zone is already in the menu under
+      "Configure new vehicle"; today it only reports the file it was given.
+      From the metadata the panel derives which sensors exist, sorts them into
+      GNSS, cameras and lidar, takes each one's topic list, and computes its
+      rate as `message_count / duration` **rounded to the nearest 0.5 Hz** —
+      19.87 becomes a target of 20.0. Those become the `expected_hz` the live
+      readings are judged against, so the lights are measured against a
+      known-good recording rather than a number somebody typed into
+      `config.json`. Dragging the metadata file is enough; the bag itself is not
+      needed. The import has to show what it derived and be confirmed before it
+      replaces the running config — a reference bag recorded while the GNSS was
+      still at 1 Hz would otherwise install 1.0 Hz as the target and report
+      green forever.
+- [ ] have the model emit that config as a structured output, for the setups a
+      bag alone cannot describe
 
 The full plan and every open question is in [PROJECT_PLAN.md](PROJECT_PLAN.md).
