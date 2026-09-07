@@ -13,6 +13,9 @@ visualiser opens in its own window; the start button below the heading is the
 same RViz process the recorder competes with, so it will not start while a
 recording is running.
 
-Pick which source you want under the burger menu, in Display.
+The lidar operating-mode buttons live here too, under the sensor blocks.
+They used to be on Status; Status has no controls at all now.
+
+Pick which visualiser you want under the burger menu, in Display.
 
 TODO: wire the per-sensor buttons once the car exposes per-sensor launch files.

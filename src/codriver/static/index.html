@@ -162,17 +162,17 @@
   .title { font-size: 25.5px; font-weight: 500; }
   .hint { font-size: 18px; color: var(--text-muted); }
 
-  /* Status: boxes flow into as many columns as fit. One long column meant the
-     lidar block was below the fold on every screen, and the thing this tab
-     exists for is being readable at a glance without scrolling. The minimum
-     column width is what a sensor name needs, so the portrait screen in the
-     car collapses back to a single column on its own.
-
-     Multi-column rather than a grid: the blocks are wildly different heights,
-     and a grid would leave a column's worth of dead space under the one-row
-     GNSS box. Columns pack instead of aligning. */
-  .status-grid { columns: 2 360px; column-gap: 12px; }
-  .status-grid > * { break-inside: avoid; margin-bottom: 12px; }
+  /* Status: two fixed columns rather than a flow. GNSS and lidar on the left,
+     cameras on the right, because which side a sensor lives on should not move
+     when a block changes height. One long column meant the lidar block was
+     below the fold on every screen, and being readable at a glance is the
+     whole job of this tab. The minimum column width is what a sensor name
+     needs, so the portrait screen in the car collapses to one column. */
+  .status-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 12px; align-items: start;
+  }
+  .status-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   /* Past ten sensors a block splits its own rows into two columns rather than
      running off the bottom of the screen. */
   .rows.two-col { display: grid; grid-template-columns: 1fr 1fr; }
@@ -643,11 +643,19 @@ function commandsBlock() {
     </section>`;
 }
 
+// Status is read-only. Nothing on it starts, stops or triggers anything: it is
+// the screen you look at to find out whether something is wrong, and every
+// control that used to live here is on Monitoring now. That includes the sweep
+// button, so this tab cannot be the thing that made the car busy.
 function renderStatus() {
   const sensors = ui.data.sensors;
   const checked = sensors.last_checked
     ? new Date(sensors.last_checked * 1000).toLocaleTimeString()
     : "never";
+  // Cameras are the long block, so they get a column to themselves; GNSS and
+  // lidar share the other one.
+  const cameras = sensors.blocks.filter((b) => b.kind === "camera");
+  const rest = sensors.blocks.filter((b) => b.kind !== "camera");
 
   return `
     <div class="stage-head">
@@ -655,17 +663,12 @@ function renderStatus() {
         <div class="kicker">Status</div>
         <div class="title">Sensor availability and rate</div>
       </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span class="hint">checked ${esc(checked)} via ${esc(sensors.backend)}</span>
-        <button data-action="refresh" ${sensors.sweeping ? "disabled" : ""}>
-          ${sensors.sweeping ? "checking..." : "check now"}
-        </button>
-      </div>
+      <span class="hint">checked ${esc(checked)} via ${esc(sensors.backend)}${sensors.sweeping ? " - checking now" : ""}</span>
     </div>
     ${sensors.error ? `<div class="cmd-out fail">${esc(sensors.error)}</div>` : ""}
     <div class="status-grid">
-      ${sensors.blocks.map(blockHtml).join("")}
-      ${commandsBlock()}
+      <div class="status-col">${rest.map(blockHtml).join("")}</div>
+      <div class="status-col">${cameras.map(blockHtml).join("")}</div>
     </div>`;
 }
 
@@ -701,7 +704,7 @@ function renderMonitoring() {
         <span class="tally">${block.ok_count}/${block.required_count} required ok</span>
       </div>
       <div class="rows">${block.sensors.map(monitorRow).join("")}</div>
-    </section>`).join("");
+    </section>`).join("") + commandsBlock();
 
   const source = settings.viz === "foxglove" ? "Foxglove" : "RViz";
   // RViz still shares an exclusive group with the recorder on the backend, so

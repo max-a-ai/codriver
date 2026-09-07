@@ -59,13 +59,19 @@ language work will need.
 
 ### Status
 
-The GNSS, the eight cameras, the seven lidars, and the lidar operating-mode
-scripts, flowing into as many columns as the window fits. GNSS goes first
-because it is the one that comes up wrong. Green means the topic is being
+GNSS and the seven lidars on the left, the eight cameras on the right. GNSS
+leads because it is the one that comes up wrong. Green means the topic is being
 published at the rate it should be. Red means it is absent, silent, or off rate.
 Three sensors are listed but marked optional, and their failing does not turn
 their box red: the front-centre fisheye, which is never recorded, and the two
 bumper lidars.
+
+**Status has no controls at all.** Not the operating-mode buttons, not even the
+sweep button — they are all on Monitoring. This is the screen you read, not the
+one you act on, which means glancing at it can never be the thing that made the
+car busy. Two fixed columns rather than a flow, so which side a sensor lives on
+does not move when a block changes height; the portrait screen in the car
+collapses them back to one.
 
 A block longer than ten sensors splits into two columns of its own rather than
 running off the bottom of the screen.
@@ -101,6 +107,9 @@ Those three are **disabled on purpose**. The panel can read a sensor's rate, but
 it has no per-sensor driver control yet and nothing to render a single topic
 into. The row is here so the layout is settled before the wiring exists, and the
 buttons say so on hover rather than looking live and doing nothing.
+
+The lidar operating-mode buttons live here too, under the sensor blocks, along
+with the sweep button. Everything that does something is on this tab.
 
 The lower half is where RViz or Foxglove will be embedded. Until then the
 visualiser opens in its own window, started from the button above the pane.
@@ -295,10 +304,11 @@ it. `ruff` and `mypy --strict` are clean.
 Done:
 
 - [x] three-column shell, five vertical tabs, right rail split to match
-- [x] status tab: cameras, lidar, GNSS, operating-mode command buttons, laid
-      out in columns so nothing is below the fold
-- [x] monitoring tab: per-sensor rows with start / stop / visualise, and the
-      pane the visualiser will be embedded into
+- [x] status tab: read-only, GNSS and lidar left, cameras right, nothing
+      below the fold and no controls at all
+- [x] monitoring tab: per-sensor rows with start / stop / visualise, the lidar
+      operating-mode buttons, the sweep button, and the pane the visualiser
+      will be embedded into
 - [x] recording on its own tab, still mutually exclusive with the visualiser,
       stop is a real Ctrl-C
 - [x] per-sensor recording switches, group switches, topics passed to the script
@@ -333,8 +343,9 @@ codebases that drive it through the same commands a human can click.
 - [ ] embedded visualisation — evaluate Foxglove (streaming to a bridge, then
       subscribing and decoding) against RViz (direct subscription, no
       intermediate hop) and find out where the latency actually comes from
-- [ ] make **Status** strictly non-interactive: move the operating-mode buttons
-      to Monitoring and put an error terminal along the bottom
+- [x] make **Status** strictly non-interactive: the operating-mode and sweep
+      buttons moved to Monitoring
+- [ ] put an error terminal along the bottom of Status
 - [ ] a bigger, red, unmistakable record button
 - [ ] a legend for what the colours mean
 - [ ] a terminal view
