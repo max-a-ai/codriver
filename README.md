@@ -395,6 +395,20 @@ codebases that drive it through the same commands a human can click.
       replaces the running config — a reference bag recorded while the GNSS was
       still at 1 Hz would otherwise install 1.0 Hz as the target and report
       green forever.
+- [ ] **vehicle profiles.** One panel, several vehicles, each a saved config
+      the menu can switch between: `ava` (the car, today's defaults),
+      `fusebike` (the bike) and `robowilliam` (a roboracer template). A profile
+      owns everything that makes the panel look the way it does for that
+      vehicle — which blocks exist and what they are called, the sensors in
+      each, their rates and topics, and which recording group buttons make
+      sense. Importing a bag creates or updates one profile, so dropping a bike
+      recording cannot overwrite the car.
+- [ ] **a per-topic role, editable in the settings**: required / not always
+      required / ignore, listed for every topic the profile knows about. The
+      first two already exist as `critical: true|false`; the new one is
+      `ignore`, which drops a topic from the status blocks and the recording
+      switches entirely. This is what replaces hand-editing `config.json` to
+      change which cameras count as required.
 - [ ] have the model emit that config as a structured output, for the setups a
       bag alone cannot describe
 

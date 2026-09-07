@@ -122,6 +122,61 @@ Ordered so that each step is testable on its own.
       should show what it derived and make somebody confirm it before it
       replaces the running config, rather than applying it straight away.
 
+- [ ] **2.7** **Vehicle profiles.** One panel, several vehicles. Each is a saved
+      config the panel can switch between, named and listed in the menu:
+
+      | profile | what it is |
+      |---|---|
+      | `ava` | the car. Eight cameras, seven lidars, GNSS. The current defaults. |
+      | `fusebike` | the bike. A different and much smaller sensor set. |
+      | `robowilliam` | a roboracer template, starting from whatever it publishes. |
+
+      A profile owns everything that makes the panel look the way it does for
+      that vehicle: which sensor blocks exist and what they are called, the
+      sensors in each, their expected rates, their topics, and which group
+      buttons the recording tab shows. "All cameras" is not a useful button on a
+      vehicle with one camera, so the blocks and their group switches have to
+      come out of the profile rather than being hard-coded.
+
+      Importing a bag's `metadata.yaml` (2.6) creates or updates a profile
+      rather than editing one global config. Dropping a fusebike recording must
+      not overwrite the car.
+
+- [ ] **2.8** **Per-topic role, editable in the settings.** Today a sensor is
+      `critical: true|false`, which is two states: it counts toward its block's
+      health and records by default, or it does not. Widen that to three, listed
+      per topic and changeable in the menu:
+
+      | role | status tab | recording |
+      |---|---|---|
+      | **required** | counts toward the block; red here fails the block | on by default |
+      | **not always required** | shown, can go red, never fails the block | off by default |
+      | **ignore** | not shown at all | never offered |
+
+      Two of the three already exist — `critical: true` and `critical: false`
+      are exactly the first two rows — so the schema change is replacing the
+      boolean with a three-valued `role`, and adding a filter that drops
+      `ignore` before the status blocks and the recording switches are built.
+      `critical` is read in six places (`sensors.py` twice, `recording.py` four
+      times); all six become a comparison against the role.
+
+      The editor lists every topic the profile knows about, which after 2.6 is
+      every topic in the reference bag, with the three roles as a choice per
+      row. That is what replaces hand-editing `config.json` to change which
+      cameras are "required".
+
+      For AVA the current presets are the defaults and should stay that way
+      — every camera except the front-centre fisheye, every lidar except the two
+      bumper units — but they stop being baked into the code.
+
+      Open, and worth settling before building it:
+
+      - Does editing a role write straight back to the profile on disk, or does
+        it need a save step? Straight back is friendlier and is what a settings
+        panel usually implies; a save step is safer on a car.
+      - Is `ignore` per profile only, or does the panel also keep a global
+        ignore list for topics no vehicle should ever show?
+
 ## Phase 3: not mine, but the tabs are there
 
 Map, Prediction and Planning are placeholders on purpose. If somebody builds
