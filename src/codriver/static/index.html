@@ -153,10 +153,15 @@
   .doc-btn .cap { font-size: 15px; }
 
   /* centre stage */
+  /* A flex column so a tab that wants the remaining height gets exactly that,
+     rather than `height: 100%` of a box the header also lives in - which put
+     the bottom of the monitoring tab below the fold. */
   .stage {
     background: var(--bg-panel); border: 0.5px solid var(--border);
     border-radius: 12px; padding: 16px 20px; overflow-y: auto; min-width: 0;
+    display: flex; flex-direction: column;
   }
+  .stage > .stage-head { flex: none; }
   .stage-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
   .kicker { font-size: 16.5px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
   .title { font-size: 25.5px; font-weight: 500; }
@@ -343,7 +348,22 @@
 
   /* Monitoring: sensors on top, the visualisation pane filling the bottom
      half. The pane is empty on purpose until RViz or Foxglove is embedded. */
-  .mon { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; height: 100%; min-height: 620px; }
+  /* Collapsed by default the visualisation pane is just its own header, and
+     the sensors get the whole tab. Opening it splits the height evenly. */
+  .mon {
+    display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 12px;
+    flex: 1 1 auto; min-height: 320px;
+  }
+  .mon.viz-open { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .viz-panel { overflow: hidden; }
+  .viz-head { gap: 10px; }
+  .viz-head .src-group { display: flex; gap: 6px; margin-left: auto; }
+  .viz-head .src { font-size: 17px; padding: 3px 10px; }
+  .viz-head .src.on { background: var(--on-tint); border-color: var(--accent); color: var(--text-primary); }
+  /* Collapsed, the whole header row is the way back in, so the click target is
+     the bar rather than just the chevron. */
+  .mon:not(.viz-open) .viz-panel { cursor: pointer; }
+  .mon:not(.viz-open) .viz-panel:hover { border-color: var(--accent); }
   /* The panel is a flex column with a bounded height, so without this the
      blocks shrink below their own content and `overflow: hidden` eats the
      sensor rows. Let them keep their height and let the panel scroll. */
@@ -481,6 +501,12 @@ const ui = {
   pending: new Set(),
   modal: null,
   drawer: false,
+  // The markup the stage is currently showing, so an unchanged poll can leave
+  // the DOM (and everything scrolled inside it) alone.
+  lastStage: null,
+  // The visualisation pane starts collapsed: it is empty until something is
+  // embedded in it, and the sensor list is what you came to this tab for.
+  vizOpen: localStorage.getItem("codriver.vizOpen") === "1",
 };
 
 // Preferences that belong to whoever is sitting in front of this screen rather
@@ -510,6 +536,8 @@ const ICON = {
   play: '<path d="M8 5.5v13l10-6.5z"/>',
   stop: '<rect x="7" y="7" width="10" height="10" rx="1.4"/>',
   eye: '<path d="M1.8 12S5.5 5.5 12 5.5 22.2 12 22.2 12 18.5 18.5 12 18.5 1.8 12 1.8 12z"/><circle cx="12" cy="12" r="3"/>',
+  chevronUp: '<path d="M6 14.5 12 8.5l6 6"/>',
+  chevronDown: '<path d="M6 9.5 12 15.5l6-6"/>',
 };
 
 function icon(name) {
@@ -712,15 +740,43 @@ function renderMonitoring() {
   const recording = processByName("recording");
   const blocked = isUp(recording);
   const up = isUp(rviz);
-  const vizControls = rviz ? `
-    <div class="controls">
-      <button class="primary" data-action="start" data-process="rviz"
-              ${up || blocked || busy("rviz") ? "disabled" : ""}>start ${esc(rviz.label)}</button>
-      <button class="danger" data-action="stop" data-process="rviz"
-              ${!up || busy("rviz") ? "disabled" : ""}>stop</button>
-      <button data-action="log" data-process="rviz">log</button>
-    </div>
-    ${blocked ? '<div class="note">Disabled while the recorder is running. The car can record or visualise, not both.</div>' : ""}` : "";
+  const open = ui.vizOpen;
+
+  // Mock-up: switching the source changes what the pane says it will show and
+  // nothing else. Neither is embedded yet.
+  const sourcePicker = ["rviz", "foxglove"].map((v) => `
+    <button class="src ${settings.viz === v ? "on" : ""}" data-action="viz" data-viz="${v}"
+            title="Show ${v === "rviz" ? "RViz" : "Foxglove"} here (mock-up)">
+      ${v === "rviz" ? "RViz" : "Foxglove"}
+    </button>`).join("");
+
+  const head = `
+    <div class="panel-head viz-head">
+      <span class="light big ${esc(rviz ? rviz.state : "unknown")}"></span>
+      <span class="label">Visualisation</span>
+      <span class="src-group">${sourcePicker}</span>
+      <button class="icon-btn viz-chev" data-action="viz-toggle"
+              aria-expanded="${open ? "true" : "false"}"
+              title="${open ? "Collapse the visualisation pane" : "Open the visualisation pane"}"
+              aria-label="${open ? "Collapse" : "Open"} the visualisation pane">
+        ${icon(open ? "chevronDown" : "chevronUp")}
+      </button>
+    </div>`;
+
+  const body = !open ? "" : `
+    ${rviz ? `
+      <div class="controls">
+        <button class="primary" data-action="start" data-process="rviz"
+                ${up || blocked || busy("rviz") ? "disabled" : ""}>start ${esc(rviz.label)}</button>
+        <button class="danger" data-action="stop" data-process="rviz"
+                ${!up || busy("rviz") ? "disabled" : ""}>stop</button>
+        <button data-action="log" data-process="rviz">log</button>
+      </div>
+      ${blocked ? '<div class="note">Disabled while the recorder is running. The car can record or visualise, not both.</div>' : ""}` : ""}
+    <div class="viz-pane">
+      <div class="big">${esc(source)} renders here</div>
+      <div>Nothing is embedded yet. ${esc(source)} opens in its own window for now.</div>
+    </div>`;
 
   return `
     <div class="stage-head">
@@ -735,21 +791,9 @@ function renderMonitoring() {
         </button>
       </div>
     </div>
-    <div class="mon">
+    <div class="mon ${open ? "viz-open" : ""}">
       <div class="panel">${blocks}</div>
-      <div class="panel">
-        <div class="panel-head">
-          <span class="light big ${esc(rviz ? rviz.state : "unknown")}"></span>
-          <span class="label">Visualisation</span>
-          <span class="state">${esc(source)}</span>
-        </div>
-        ${vizControls}
-        <div class="viz-pane">
-          <div class="big">${esc(source)} renders here</div>
-          <div>Nothing is embedded yet. ${esc(source)} opens in its own window for now.</div>
-          <div>Change the source under the menu, in Display.</div>
-        </div>
-      </div>
+      <div class="panel viz-panel">${head}${body}</div>
     </div>`;
 }
 
@@ -932,19 +976,52 @@ function renderCustom(tab) {
     </div>`;
 }
 
-function renderStage() {
-  const stage = document.getElementById("stage");
+function stageHtml() {
   if (!ui.data) {
-    stage.innerHTML = `<div class="empty"><div class="big">Connecting to the panel backend</div></div>`;
-    return;
+    return `<div class="empty"><div class="big">Connecting to the panel backend</div></div>`;
   }
   const tab = ui.data.tabs.find((t) => t.id === ui.tab) || ui.data.tabs[0];
-  if (tab.id === "status") { stage.innerHTML = renderStatus(); return; }
-  if (tab.id === "monitoring") { stage.innerHTML = renderMonitoring(); return; }
-  if (tab.id === "recording") { stage.innerHTML = renderRecording(); return; }
-  if (tab.id === "perception") { stage.innerHTML = renderPerception(); return; }
-  if (tab.id === "custom") { stage.innerHTML = renderCustom(tab); return; }
-  stage.innerHTML = renderPlaceholder(tab);
+  if (tab.id === "status") return renderStatus();
+  if (tab.id === "monitoring") return renderMonitoring();
+  if (tab.id === "recording") return renderRecording();
+  if (tab.id === "perception") return renderPerception();
+  if (tab.id === "custom") return renderCustom(tab);
+  return renderPlaceholder(tab);
+}
+
+// Replacing the stage's innerHTML throws away every scroll position in it, and
+// at one poll a second that made the longer tabs impossible to read: you would
+// scroll down and be back at the top before you got there. Two defences.
+//
+// First, do nothing at all when the markup has not changed. On the car the
+// rates only move when a sweep runs, so most polls are a no-op and the DOM is
+// left completely alone.
+//
+// Second, when it has changed, put the scroll positions back. The stage itself
+// scrolls, and so does each panel inside it; their count and order are stable
+// within a tab, so matching them by position is enough.
+function scrollState(stage) {
+  return {
+    stage: stage.scrollTop,
+    panels: Array.from(stage.querySelectorAll(".panel")).map((p) => p.scrollTop),
+  };
+}
+
+function applyScroll(stage, saved) {
+  stage.scrollTop = saved.stage;
+  Array.from(stage.querySelectorAll(".panel")).forEach((panel, i) => {
+    if (saved.panels[i] !== undefined) panel.scrollTop = saved.panels[i];
+  });
+}
+
+function renderStage() {
+  const stage = document.getElementById("stage");
+  const html = stageHtml();
+  if (html === ui.lastStage) return;
+  const saved = scrollState(stage);
+  stage.innerHTML = html;
+  ui.lastStage = html;
+  applyScroll(stage, saved);
 }
 
 function renderHeader() {
@@ -1092,9 +1169,20 @@ async function withPending(name, fn) {
   }
 }
 
+function setVizOpen(open) {
+  ui.vizOpen = open;
+  localStorage.setItem("codriver.vizOpen", open ? "1" : "0");
+  renderStage();
+}
+
 document.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
-  if (!target) return;
+  if (!target) {
+    // Collapsed, the whole visualisation bar opens the pane, not just the
+    // chevron on the end of it.
+    if (event.target.closest(".mon:not(.viz-open) .viz-panel")) setVizOpen(true);
+    return;
+  }
   const action = target.dataset.action;
 
   if (action === "tab") {
@@ -1133,6 +1221,7 @@ document.addEventListener("click", (event) => {
   if (action === "log") { showLog(target.dataset.process); return; }
   if (action === "doc") { showDocument(target.dataset.tab); return; }
   if (action === "viz") { setSetting("viz", target.dataset.viz); renderDrawer(); renderStage(); return; }
+  if (action === "viz-toggle") { setVizOpen(!ui.vizOpen); return; }
 });
 
 // --- the drawer -------------------------------------------------------------

@@ -8,10 +8,15 @@ disabled on purpose: the panel can read a sensor's rate, but it has no
 per-sensor driver control yet and nothing to render a single topic into. The
 row is here so the layout is settled before the wiring exists.
 
-The lower half is where RViz or Foxglove will be embedded. Until then the
-visualiser opens in its own window; the start button below the heading is the
-same RViz process the recorder competes with, so it will not start while a
-recording is running.
+The visualisation pane at the bottom is collapsed to a bar. Click the bar, or
+the chevron on it, to open it to half the tab; it stays as you left it.
+
+That is where RViz or Foxglove will be embedded. Until then the visualiser opens
+in its own window; the start button inside the pane is the same RViz process the
+recorder competes with, so it will not start while a recording is running.
+
+The RViz / Foxglove buttons on the bar are a mock-up. They change what the pane
+says it will show and nothing else.
 
 The lidar operating-mode buttons live here too, under the sensor blocks.
 They used to be on Status; Status has no controls at all now.

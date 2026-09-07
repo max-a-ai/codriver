@@ -111,9 +111,11 @@ buttons say so on hover rather than looking live and doing nothing.
 The lidar operating-mode buttons live here too, under the sensor blocks, along
 with the sweep button. Everything that does something is on this tab.
 
-The lower half is where RViz or Foxglove will be embedded. Until then the
-visualiser opens in its own window, started from the button above the pane.
-Which of the two you get is a setting in the burger menu.
+The visualisation pane at the bottom is **collapsed to a bar by default** and
+opens to half the tab when you click it — the sensor list is what you came here
+for, and the pane is empty until something is embedded in it. The state is
+remembered per browser. The RViz / Foxglove buttons on the bar are a mock-up:
+they change what the pane says it will show and nothing else.
 
 ### Recording
 
@@ -340,9 +342,14 @@ codebases that drive it through the same commands a human can click.
 - [x] a **Monitoring** tab: one control per sensor, the way a container
       dashboard gives you one per service, with a visualisation pane below
 - [ ] wire those per-sensor buttons to real per-sensor start / stop / restart
-- [ ] embedded visualisation — evaluate Foxglove (streaming to a bridge, then
-      subscribing and decoding) against RViz (direct subscription, no
-      intermediate hop) and find out where the latency actually comes from
+- [ ] embedded visualisation. Foxglove is the only one of the two that can
+      actually render inside a browser page: `foxglove_bridge` is a ROS node
+      exposing a WebSocket, and the Studio web build can be self-hosted and put
+      in an iframe. RViz is a Qt desktop application and cannot render into a
+      page at all — showing it in the panel would mean streaming its window over
+      noVNC or WebRTC, which is a heavier and worse-looking hop than the
+      bridge. So: measure the bridge's latency and decide whether it is good
+      enough, rather than treating the two as equivalent options
 - [x] make **Status** strictly non-interactive: the operating-mode and sweep
       buttons moved to Monitoring
 - [ ] put an error terminal along the bottom of Status
@@ -351,7 +358,8 @@ codebases that drive it through the same commands a human can click.
 - [ ] a terminal view
 - [ ] leave room in the architecture for a **Control** tab, for closed-loop
       operation
-- [ ] stop the full re-render every second; update only what changed
+- [x] stop the 1 s re-render fighting you: an unchanged poll now leaves the DOM
+      alone entirely, and a changed one puts every scroll position back
 
 **Language and retrieval**
 
