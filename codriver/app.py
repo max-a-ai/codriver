@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config, load_config
-from .processes import CommandResult, ProcessConflictError, ProcessManager, run_command
+from .processes import (
+    CommandResult,
+    ProcessConflictError,
+    ProcessManager,
+    run_command,
+)
 from .recording import RecordingSelection
 from .ros import resolve_backend
 from .sensors import SensorMonitor
@@ -36,7 +41,8 @@ TABS: list[dict[str, str]] = [
 ]
 
 #: The sections inside the "custom functionalities" tab. Each is a placeholder
-#: with its own heading, so the shape of the eventual screen is already visible.
+#: with its own heading, so the shape of the eventual screen is already
+#: visible.
 CUSTOM_SECTIONS: list[dict[str, str]] = [
     {"id": "map", "label": "Map"},
     {"id": "prediction", "label": "Prediction"},
@@ -56,7 +62,9 @@ class App:
     def __init__(self, config: Config | None = None) -> None:
         self.config = config or load_config()
         self.monitor = SensorMonitor(self.config, resolve_backend(self.config))
-        self.processes = ProcessManager(self.config.processes, self.config.log_dir)
+        self.processes = ProcessManager(
+            self.config.processes, self.config.log_dir
+        )
         self.selection = RecordingSelection(self.config.sensors)
         self._lock = threading.Lock()
         self._command_results: dict[str, CommandResult] = {}
@@ -74,18 +82,27 @@ class App:
     # --- reads ---
 
     def is_recording(self) -> bool:
-        status = next((s for s in self.processes.statuses() if s.name == RECORDER), None)
-        return status is not None and status.state in ("initializing", "running")
+        status = next(
+            (s for s in self.processes.statuses() if s.name == RECORDER), None
+        )
+        return status is not None and status.state in (
+            "initializing",
+            "running",
+        )
 
     def state(self) -> dict[str, Any]:
         blocks, meta = self.monitor.snapshot()
         now = time.monotonic()
         with self._lock:
-            results = {name: dataclasses.asdict(r) for name, r in self._command_results.items()}
+            results = {
+                name: dataclasses.asdict(r)
+                for name, r in self._command_results.items()
+            }
         return {
             "tabs": TABS,
-            # Switching topics mid-recording would do nothing to the bag already
-            # being written, so the switches lock while the recorder is up.
+            # Switching topics mid-recording would do nothing to the bag
+            # already being written, so the switches lock while the recorder is
+            # up.
             "recording": self.selection.snapshot(locked=self.is_recording()),
             "sensors": {
                 **meta,
@@ -95,13 +112,19 @@ class App:
                 {
                     **dataclasses.asdict(status),
                     "uptime_seconds": (
-                        None if status.started_at is None else now - status.started_at
+                        None
+                        if status.started_at is None
+                        else now - status.started_at
                     ),
                 }
                 for status in self.processes.statuses()
             ],
             "commands": [
-                {"name": c.name, "label": c.label, "description": c.description}
+                {
+                    "name": c.name,
+                    "label": c.label,
+                    "description": c.description,
+                }
                 for c in self.config.commands
             ],
             "command_results": results,
@@ -138,7 +161,8 @@ class App:
                 "label": tab["label"],
                 "path": str(path),
                 "exists": False,
-                "text": f"No notes yet. Create {path} and they will show up here.",
+                "text": f"No notes yet. Create {path} and they will "
+                "show up here.",
             }
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -166,7 +190,11 @@ class App:
     def toggle_recording_topic(self, key: str) -> dict[str, Any]:
         """Flip one switch, or one group of switches, on the recording tab."""
         if self.is_recording():
-            return {"ok": False, "error": "recording is running; stop it before changing topics"}
+            return {
+                "ok": False,
+                "error": "recording is running; stop it before "
+                "changing topics",
+            }
         self.selection.toggle(key)
         return {"ok": True, "topics": self.selection.topics()}
 

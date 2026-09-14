@@ -1,4 +1,4 @@
-"""Which readings turn a light red, and when a red light drags its block down."""
+"""Which readings turn a light red, and when red drags a block down."""
 
 import time
 
@@ -8,7 +8,9 @@ from codriver.ros.mock import MockBackend
 from codriver.sensors import SensorMonitor, evaluate, group_into_blocks
 
 CAMERA = SensorSpec("camera_back", "camera", "/camera_back/image_raw", 20.0)
-OPTIONAL = SensorSpec("camera_front_center", "camera", "/cfc/image_raw", 20.0, critical=False)
+OPTIONAL = SensorSpec(
+    "camera_front_center", "camera", "/cfc/image_raw", 20.0, critical=False
+)
 
 
 def test_unprobed_sensor_is_unknown_not_bad() -> None:
@@ -18,26 +20,35 @@ def test_unprobed_sensor_is_unknown_not_bad() -> None:
 
 
 def test_absent_publisher_is_bad() -> None:
-    status = evaluate(CAMERA, RateReading.missing(CAMERA.topic, error="no publisher"))
+    status = evaluate(
+        CAMERA, RateReading.missing(CAMERA.topic, error="no publisher")
+    )
     assert status.state == "bad"
     assert status.detail == "no publisher"
 
 
 def test_advertised_but_silent_is_bad() -> None:
     reading = RateReading(
-        CAMERA.topic, present=True, hz=None, error="publisher advertised but silent"
+        CAMERA.topic,
+        present=True,
+        hz=None,
+        error="publisher advertised but silent",
     )
     assert evaluate(CAMERA, reading).state == "bad"
 
 
 def test_on_rate_is_ok() -> None:
-    status = evaluate(CAMERA, RateReading(CAMERA.topic, present=True, hz=19.8, samples=40))
+    status = evaluate(
+        CAMERA, RateReading(CAMERA.topic, present=True, hz=19.8, samples=40)
+    )
     assert status.state == "ok"
     assert status.detail == ""
 
 
 def test_off_rate_is_bad_and_says_what_it_saw() -> None:
-    status = evaluate(CAMERA, RateReading(CAMERA.topic, present=True, hz=12.4, samples=25))
+    status = evaluate(
+        CAMERA, RateReading(CAMERA.topic, present=True, hz=12.4, samples=25)
+    )
     assert status.state == "bad"
     assert "12.4 Hz" in status.detail and "20 Hz" in status.detail
 
@@ -94,12 +105,14 @@ def test_monitor_sweep_populates_every_block() -> None:
     assert meta["error"] is None
     # Stacked down a portrait screen in this order, GNSS first.
     assert [b.kind for b in blocks] == ["gnss", "camera", "lidar"]
-    # The default mock scenario reproduces the two faults worth seeing: the GNSS
-    # has fallen back to 1 Hz and the fisheye is off.
+    # The default mock scenario reproduces the two faults worth seeing: the
+    # GNSS has fallen back to 1 Hz and the fisheye is off.
     gnss = next(b for b in blocks if b.kind == "gnss")
     assert gnss.state == "bad"
     cameras = next(b for b in blocks if b.kind == "camera")
-    fisheye = next(s for s in cameras.sensors if s.name == "camera_front_center")
+    fisheye = next(
+        s for s in cameras.sensors if s.name == "camera_front_center"
+    )
     assert fisheye.state == "bad"
     assert cameras.state == "ok"  # the fisheye is not required
 

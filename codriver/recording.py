@@ -2,17 +2,19 @@
 
 The recording tab is a set of switches, one per camera and one per lidar, plus
 group switches that flip a whole column at once. What comes out is a list of
-topics, handed to the recording script as arguments, so adapting the script is a
-matter of accepting `"$@"` rather than editing a hard-coded topic list.
+topics, handed to the recording script as arguments, so adapting the
+script is a matter of accepting `"$@"` rather than editing a hard-coded
+topic list.
 
 Three rules the switches encode:
 
-*   A camera is two topics. An `image_raw` recorded without its `camera_info` is
-    a bag nobody can calibrate afterwards, so the two are never separable.
-*   The default is the sensors that matter: every camera except the front-centre
-    fisheye, every lidar except the two bumper units. The optional ones sit at
-    the bottom of their column and start off, so recording one is always a
-    deliberate act.
+*   A camera is two topics. An `image_raw` recorded without its
+    `camera_info` is a bag nobody can calibrate afterwards, so the two
+    are never separable.
+*   The default is the sensors that matter: every camera except the
+    front-centre fisheye, every lidar except the two bumper units. The
+    optional ones sit at the bottom of their column and start off, so
+    recording one is always a deliberate act.
 *   The GNSS has no switch. It is small, it is always wanted, and a recording
     that quietly lost it is worthless.
 """
@@ -43,25 +45,35 @@ class RecordingSelection:
 
     def __init__(self, sensors: list[SensorSpec]) -> None:
         self._sensors = list(sensors)
-        #: The ones that get a switch: cameras and lidars that are not pinned on.
+        #: The ones that get a switch: cameras and lidars that are not pinned
+        #: on.
         self._switchable = [
-            s for s in self._sensors if s.kind in ("camera", "lidar") and not s.always_record
+            s
+            for s in self._sensors
+            if s.kind in ("camera", "lidar") and not s.always_record
         ]
         self._lock = threading.Lock()
         # Default: everything that matters, nothing that does not.
-        self._selected: set[str] = {s.name for s in self._switchable if s.critical}
+        self._selected: set[str] = {
+            s.name for s in self._switchable if s.critical
+        }
 
     # --- groups ---
 
     def _members(self, key: str) -> list[str]:
-        """The sensors a button covers. KeyError if the button does not exist."""
+        """The sensors a button covers. KeyError if there is no such
+        button."""
         if key == GROUP_ALL:
             return [s.name for s in self._switchable]
         for kind, _label, all_key, required_key in _COLUMNS:
             if key == all_key:
                 return [s.name for s in self._switchable if s.kind == kind]
             if key == required_key:
-                return [s.name for s in self._switchable if s.kind == kind and s.critical]
+                return [
+                    s.name
+                    for s in self._switchable
+                    if s.kind == kind and s.critical
+                ]
         if any(s.name == key for s in self._switchable):
             return [key]
         raise KeyError(key)

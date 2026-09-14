@@ -93,9 +93,13 @@ class PanelHandler(BaseHTTPRequestHandler):
         try:
             self._send_json(handler(self, match))
         except KeyError as exc:
-            self._send_json({"error": f"unknown name {exc.args[0]!r}"}, status=404)
+            self._send_json(
+                {"error": f"unknown name {exc.args[0]!r}"}, status=404
+            )
         except Exception as exc:
-            self._send_json({"error": f"{type(exc).__name__}: {exc}"}, status=500)
+            self._send_json(
+                {"error": f"{type(exc).__name__}: {exc}"}, status=500
+            )
 
     # --- endpoints ---
 
@@ -150,9 +154,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             return
         body = target.read_bytes()
         self.send_response(200)
-        self.send_header("Content-Type", _MIME.get(target.suffix, "application/octet-stream"))
+        self.send_header(
+            "Content-Type",
+            _MIME.get(target.suffix, "application/octet-stream"),
+        )
         self.send_header("Content-Length", str(len(body)))
-        # The panel is edited in place on the car; a cached shell would hide it.
+        # The panel is edited in place on the car; a cached shell would hide
+        # it.
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)

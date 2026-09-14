@@ -19,7 +19,7 @@ from .server import PanelServer
 def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="codriver",
-        description="In-car panel for starting demos and checking sensor health.",
+        description="In-car panel: start demos, check sensor health.",
     )
     parser.add_argument("--host", help="bind address (default from config)")
     parser.add_argument("--port", type=int, help="port (default from config)")
@@ -28,7 +28,9 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
         choices=["auto", "mock", "rclpy", "ros2cli", "bag"],
         help="how to measure sensor rates; overrides the config",
     )
-    parser.add_argument("--open", action="store_true", help="open a browser once up")
+    parser.add_argument(
+        "--open", action="store_true", help="open a browser once up"
+    )
     parser.add_argument(
         "--dump-config",
         action="store_true",
@@ -37,7 +39,8 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--defaults",
         action="store_true",
-        help="with --dump-config, print the built-in defaults instead of the loaded config",
+        help="with --dump-config, print the built-in defaults instead "
+        "of the loaded config",
     )
     return parser.parse_args(argv)
 
@@ -82,7 +85,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # of its own, which is the only supported way to stop one of these
         # servers from the inside.
         print("\ncodriver   stopping children and shutting down")
-        threading.Thread(target=server.shutdown, name="shutdown", daemon=True).start()
+        threading.Thread(
+            target=server.shutdown, name="shutdown", daemon=True
+        ).start()
 
     signal.signal(signal.SIGINT, shut_down)
     signal.signal(signal.SIGTERM, shut_down)

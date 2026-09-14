@@ -45,22 +45,32 @@ class MockBackend:
     name = "mock"
 
     def __init__(self, scenario: str | None = None) -> None:
-        self.scenario = scenario or os.environ.get("CODRIVER_MOCK_SCENARIO", "typical")
+        self.scenario = scenario or os.environ.get(
+            "CODRIVER_MOCK_SCENARIO", "typical"
+        )
         if self.scenario not in _SCENARIOS:
             known = ", ".join(sorted(_SCENARIOS))
-            raise ValueError(f"unknown mock scenario {self.scenario!r} (known: {known})")
+            raise ValueError(
+                f"unknown mock scenario {self.scenario!r} (known: {known})"
+            )
 
     def available(self) -> bool:
         return True
 
-    def measure(self, topics: Sequence[str], duration: float) -> dict[str, RateReading]:
+    def measure(
+        self, topics: Sequence[str], duration: float
+    ) -> dict[str, RateReading]:
         # Mimic the cost of a real sweep so the UI's pending state is visible,
         # but never make a developer wait the full window.
         time.sleep(min(duration, 0.4))
         faults = _SCENARIOS[self.scenario]
-        return {topic: self._reading(topic, faults, duration) for topic in topics}
+        return {
+            topic: self._reading(topic, faults, duration) for topic in topics
+        }
 
-    def _reading(self, topic: str, faults: dict[str, str], duration: float) -> RateReading:
+    def _reading(
+        self, topic: str, faults: dict[str, str], duration: float
+    ) -> RateReading:
         fault = next((f for key, f in faults.items() if key in topic), None)
         if fault == "absent":
             return RateReading.missing(topic, error="no publisher (mock)")
@@ -70,8 +80,10 @@ class MockBackend:
         hz = 1.0 if fault == "slow" and "gnss" in topic else nominal
         if fault == "slow" and "gnss" not in topic:
             hz = nominal * 0.55
-        # A wobble keyed to the topic name and the clock: stable enough to read,
-        # moving enough to show that the panel is really polling.
+        # A wobble keyed to the topic name and the clock: stable enough to
+        # read, moving enough to show that the panel is really polling.
         jitter = math.sin(time.monotonic() / 3.0 + len(topic)) * 0.015 * hz
         hz = max(0.0, hz + jitter)
-        return RateReading(topic=topic, present=True, hz=hz, samples=int(hz * duration))
+        return RateReading(
+            topic=topic, present=True, hz=hz, samples=int(hz * duration)
+        )

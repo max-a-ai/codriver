@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from codriver.app import App
-from codriver.config import Config, ProcessSpec, default_config, default_record_topics
+from codriver.config import (
+    Config,
+    ProcessSpec,
+    default_config,
+    default_record_topics,
+)
 from codriver.recording import RecordingSelection
 
 
@@ -17,7 +22,10 @@ def _selection() -> RecordingSelection:
 def test_default_is_the_sensors_that_matter() -> None:
     selected = set(_selection().snapshot(locked=False)["selected"])
     assert "camera_front_center" not in selected
-    assert "lidar_bumper_front" not in selected and "lidar_bumper_back" not in selected
+    assert (
+        "lidar_bumper_front" not in selected
+        and "lidar_bumper_back" not in selected
+    )
     assert len(selected) == 12  # 7 required cameras + 5 required lidars
 
 
@@ -59,7 +67,11 @@ def test_gnss_is_recorded_whatever_the_switches_say() -> None:
     assert selection.topics() == ["/gnss/fix"]
     # And it is not offered as a switch.
     snapshot = selection.snapshot(locked=False)
-    names = [s["name"] for col in snapshot["columns"] for s in col["required"] + col["optional"]]
+    names = [
+        s["name"]
+        for col in snapshot["columns"]
+        for s in col["required"] + col["optional"]
+    ]
     assert "gnss" not in names
     assert snapshot["always"] == [{"name": "gnss", "topics": ["/gnss/fix"]}]
 
@@ -69,13 +81,20 @@ def test_group_button_turns_a_whole_column_on_then_off() -> None:
     selection.toggle("cameras")  # required were on, so this fills the column
     snapshot = selection.snapshot(locked=False)
     cameras = next(c for c in snapshot["columns"] if c["kind"] == "camera")
-    assert all(s["state"] == "on" for s in cameras["required"] + cameras["optional"])
-    assert next(g for g in cameras["groups"] if g["key"] == "cameras")["state"] == "on"
+    assert all(
+        s["state"] == "on" for s in cameras["required"] + cameras["optional"]
+    )
+    assert (
+        next(g for g in cameras["groups"] if g["key"] == "cameras")["state"]
+        == "on"
+    )
 
     selection.toggle("cameras")  # fully on, so now fully off
     snapshot = selection.snapshot(locked=False)
     cameras = next(c for c in snapshot["columns"] if c["kind"] == "camera")
-    assert all(s["state"] == "off" for s in cameras["required"] + cameras["optional"])
+    assert all(
+        s["state"] == "off" for s in cameras["required"] + cameras["optional"]
+    )
     # Lidars were not touched.
     lidars = next(c for c in snapshot["columns"] if c["kind"] == "lidar")
     assert any(s["state"] == "on" for s in lidars["required"])
@@ -150,9 +169,13 @@ def _app_with_recorder(tmp_path: Path) -> App:
     return App(config)
 
 
-def test_the_recorder_is_started_with_the_selected_topics(tmp_path: Path) -> None:
+def test_the_recorder_is_started_with_the_selected_topics(
+    tmp_path: Path,
+) -> None:
     app = _app_with_recorder(tmp_path)
-    app.selection.toggle("lidar_bumper_front")  # one extra, to prove it is not hardcoded
+    app.selection.toggle(
+        "lidar_bumper_front"
+    )  # one extra, to prove it is not hardcoded
     expected = app.selection.topics()
 
     assert app.start_process("recording") == {"ok": True}
@@ -171,7 +194,9 @@ def test_the_recorder_is_started_with_the_selected_topics(tmp_path: Path) -> Non
         app.shutdown()
 
 
-def test_topics_cannot_be_changed_while_the_recorder_runs(tmp_path: Path) -> None:
+def test_topics_cannot_be_changed_while_the_recorder_runs(
+    tmp_path: Path,
+) -> None:
     app = _app_with_recorder(tmp_path)
     before = app.selection.topics()
     app.start_process("recording")
@@ -190,11 +215,16 @@ def test_topics_cannot_be_changed_while_the_recorder_runs(tmp_path: Path) -> Non
 
 def test_recording_with_nothing_selected_is_refused(tmp_path: Path) -> None:
     app = _app_with_recorder(tmp_path)
-    # Switch everything off. The GNSS is pinned on, so drop it from the registry
-    # first to reach a genuinely empty selection.
-    app.selection = RecordingSelection([s for s in app.config.sensors if not s.always_record])
+    # Switch everything off. The GNSS is pinned on, so drop it from the
+    # registry first to reach a genuinely empty selection.
+    app.selection = RecordingSelection(
+        [s for s in app.config.sensors if not s.always_record]
+    )
     app.selection.toggle("all")  # partial, so this fills it
     app.selection.toggle("all")  # now fully on, so this empties it
     assert app.selection.topics() == []
-    assert app.start_process("recording") == {"ok": False, "error": "no topics selected"}
+    assert app.start_process("recording") == {
+        "ok": False,
+        "error": "no topics selected",
+    }
     app.shutdown()

@@ -61,14 +61,20 @@ def test_state_lists_the_five_tabs_with_one_placeholder(panel: str) -> None:
     state = _get(panel + "/api/state")
     assert [t["id"] for t in state["tabs"]] == [t["id"] for t in TABS]
     assert len(state["tabs"]) == 5
-    placeholders = [t["id"] for t in state["tabs"] if t["kind"] == "placeholder"]
+    placeholders = [
+        t["id"] for t in state["tabs"] if t["kind"] == "placeholder"
+    ]
     assert placeholders == ["custom"]
 
 
 def test_custom_tab_carries_its_three_sections(panel: str) -> None:
     # Map, prediction and planning are sections of one tab now, not three tabs.
     state = _get(panel + "/api/state")
-    assert [s["id"] for s in state["custom_sections"]] == ["map", "prediction", "planning"]
+    assert [s["id"] for s in state["custom_sections"]] == [
+        "map",
+        "prediction",
+        "planning",
+    ]
 
 
 def test_the_visualiser_is_grouped_with_monitoring(panel: str) -> None:
@@ -81,7 +87,11 @@ def test_the_visualiser_is_grouped_with_monitoring(panel: str) -> None:
 
 def test_state_carries_the_three_sensor_blocks(panel: str) -> None:
     state = _get(panel + "/api/state")
-    assert [b["kind"] for b in state["sensors"]["blocks"]] == ["gnss", "camera", "lidar"]
+    assert [b["kind"] for b in state["sensors"]["blocks"]] == [
+        "gnss",
+        "camera",
+        "lidar",
+    ]
     assert state["sensors"]["backend"] == "mock"
 
 
@@ -98,7 +108,10 @@ def test_running_a_command_returns_its_output(panel: str) -> None:
 
 
 def test_unknown_names_are_404_not_500(panel: str) -> None:
-    for path, method in (("/api/commands/nope", "POST"), ("/api/processes/nope/log", "GET")):
+    for path, method in (
+        ("/api/commands/nope", "POST"),
+        ("/api/processes/nope/log", "GET"),
+    ):
         request = urllib.request.Request(
             panel + path, method=method, data=b"" if method == "POST" else None
         )
@@ -112,7 +125,9 @@ def test_every_tab_has_a_note_in_the_repo(panel: str) -> None:
     # something. These are shipped in the repo's instructions/ folder.
     for tab in TABS:
         payload = _get(f"{panel}/api/document/{tab['id']}")
-        assert payload["exists"] is True, f"instructions/{tab['id']}.md is missing"
+        assert payload["exists"] is True, (
+            f"instructions/{tab['id']}.md is missing"
+        )
         assert payload["label"] == tab["label"]
         assert payload["path"].endswith(f"instructions/{tab['id']}.md")
         assert payload["text"].strip()
@@ -124,7 +139,9 @@ def test_a_note_for_an_unknown_tab_is_404(panel: str) -> None:
     assert caught.value.code == 404
 
 
-def test_a_missing_note_file_is_a_normal_answer(panel: str, tmp_path: Any) -> None:
+def test_a_missing_note_file_is_a_normal_answer(
+    panel: str, tmp_path: Any
+) -> None:
     # Point the panel at an empty folder: a tab with no note must still answer.
     empty = tmp_path / "no-notes"
     empty.mkdir()

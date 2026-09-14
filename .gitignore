@@ -1,20 +1,41 @@
-# Python-generated files
+# UV / Python
+.venv/
 __pycache__/
-*.py[oc]
-build/
+*.py[cod]
+*.egg-info/
 dist/
-wheels/
-*.egg-info
+build/
 
-# Virtual environments
-.venv
+# Type checker / lint caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
 
-# Unpacked template, kept as a reference and rebuildable from the zip
-globalopenhack/
+# IDE
+.idea/
+.vscode/
 
-# graphify working directory. The graph is built over the unpacked template as
-# well, which is not in this repo, so the exported graph is local-only.
-graphify-out/
+# Machine-dependent, never committed (built by <module>/scripts/dm_link.py)
+/resources/
+/outputs/
 
+# Executed notebook copies
+/notebooks/*.executed.ipynb
+
+# NOTE: .docs/ is deliberately NOT ignored -- it is the record of
+# the work (progress.md, figures, latex-draft, promoted runs).
+
+# Experiment tracking caches
+wandb/
+
+# OS
+.DS_Store
+
+# Project-specific
+# Unpacked reference template, rebuildable from the zip
+/globalopenhack/
+# graphify working directory; the exported graph covers the unpacked
+# template too, so it is local-only
+/graphify-out/
 # Panel runtime output
 *.log

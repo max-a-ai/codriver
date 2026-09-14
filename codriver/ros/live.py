@@ -32,8 +32,8 @@ from typing import Any
 
 from .backend import RateReading
 
-#: Seconds spent letting DDS discovery settle before subscribing. Without it the
-#: graph is still empty and every topic looks absent.
+#: Seconds spent letting DDS discovery settle before subscribing. Without it
+#: the graph is still empty and every topic looks absent.
 DISCOVERY_SECONDS = 1.0
 
 #: Headroom on top of the measurement window before the child is killed.
@@ -43,7 +43,10 @@ _SUBPROCESS_GRACE = 20.0
 def rclpy_importable() -> bool:
     try:
         return importlib.util.find_spec("rclpy") is not None
-    except (ImportError, ValueError):  # pragma: no cover - odd interpreter states
+    except (
+        ImportError,
+        ValueError,
+    ):  # pragma: no cover - odd interpreter states
         return False
 
 
@@ -58,7 +61,9 @@ class RclpyBackend:
     def available(self) -> bool:
         return rclpy_importable()
 
-    def measure(self, topics: Sequence[str], duration: float) -> dict[str, RateReading]:
+    def measure(
+        self, topics: Sequence[str], duration: float
+    ) -> dict[str, RateReading]:
         if not topics:
             return {}
         argv = [
@@ -69,8 +74,8 @@ class RclpyBackend:
             str(duration),
             *topics,
         ]
-        # Keep the package importable in the child whether the app was installed
-        # or is running straight from the source tree.
+        # Keep the package importable in the child whether the app was
+        # installed or is running straight from the source tree.
         src_root = str(Path(__file__).resolve().parents[2])
         env = {**_child_env(), "PYTHONPATH": _prepend_path(src_root)}
         try:
@@ -89,7 +94,9 @@ class RclpyBackend:
 
         if proc.returncode != 0:
             detail = (proc.stderr or "").strip().splitlines()
-            return _all_failed(topics, detail[-1] if detail else "rclpy probe failed")
+            return _all_failed(
+                topics, detail[-1] if detail else "rclpy probe failed"
+            )
         try:
             payload = json.loads(proc.stdout)
         except json.JSONDecodeError:
@@ -114,14 +121,20 @@ def _all_failed(topics: Sequence[str], error: str) -> dict[str, RateReading]:
     return {topic: RateReading.missing(topic, error=error) for topic in topics}
 
 
-def _readings_from(payload: Any, topics: Sequence[str]) -> dict[str, RateReading]:
+def _readings_from(
+    payload: Any, topics: Sequence[str]
+) -> dict[str, RateReading]:
     if not isinstance(payload, dict):
-        return _all_failed(topics, "rclpy probe returned an unexpected payload")
+        return _all_failed(
+            topics, "rclpy probe returned an unexpected payload"
+        )
     results: dict[str, RateReading] = {}
     for topic in topics:
         item = payload.get(topic)
         if not isinstance(item, dict):
-            results[topic] = RateReading.missing(topic, error="topic missing from probe result")
+            results[topic] = RateReading.missing(
+                topic, error="topic missing from probe result"
+            )
             continue
         hz = item.get("hz")
         results[topic] = RateReading(
@@ -155,15 +168,18 @@ class _Counter:
         self.count += 1
 
     def hz(self) -> float | None:
-        # n messages span n-1 intervals. Dividing by the requested window instead
-        # would report low whenever the window opens just after a frame.
+        # n messages span n-1 intervals. Dividing by the requested window
+        # instead would report low whenever the window opens just after a
+        # frame.
         if self.count < 2:
             return None
         span = self.last - self.first
         return (self.count - 1) / span if span > 0 else None
 
 
-def _probe(topics: Sequence[str], duration: float) -> dict[str, dict[str, Any]]:
+def _probe(
+    topics: Sequence[str], duration: float
+) -> dict[str, dict[str, Any]]:
     """Subscribe to every topic at once and count what arrives. Needs rclpy."""
     import rclpy
     from rclpy.qos import HistoryPolicy, QoSProfile
@@ -199,7 +215,9 @@ def _probe(topics: Sequence[str], duration: float) -> dict[str, dict[str, Any]]:
                         "present": True,
                         "hz": None,
                         "samples": 0,
-                        "error": f"unknown message type {info.topic_type}: {exc}",
+                        "error": (
+                            f"unknown message type {info.topic_type}: {exc}"
+                        ),
                     }
                     continue
 
@@ -220,7 +238,12 @@ def _probe(topics: Sequence[str], duration: float) -> dict[str, dict[str, Any]]:
                         raw=True,  # count bytes, never deserialise
                     )
                 )
-                results[topic] = {"present": True, "hz": None, "samples": 0, "error": None}
+                results[topic] = {
+                    "present": True,
+                    "hz": None,
+                    "samples": 0,
+                    "error": None,
+                }
 
             end = time.monotonic() + duration
             while time.monotonic() < end:

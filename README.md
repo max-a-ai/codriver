@@ -5,7 +5,7 @@ compute. It does two jobs: tell you at a glance whether the sensors are healthy,
 and start and stop the demo the way you would from a terminal, without the
 terminal.
 
-![The Status tab: GNSS, cameras and lidar with live rates](docs/img/status.png)
+![The Status tab: GNSS, cameras and lidar with live rates](.docs/figures/status.png)
 
 The backend runs the scripts and measures the sensors. The frontend is one HTML
 file served by that same backend, so there is one process and one port. No
@@ -21,9 +21,9 @@ You do not need a car, or ROS, to see the whole panel. The demo config runs
 against invented sensors and stand-in scripts:
 
 ```bash
-git clone <this repo> && cd codriver
-uv sync --extra dev
-CODRIVER_CONFIG=examples/demo.json uv run python -m codriver --open
+git clone git@github.com:max-a-ai/codriver.git && cd codriver
+uv sync
+CODRIVER_CONFIG=configs/demo.json uv run codriver --open
 ```
 
 The demo scenario deliberately shows the two faults worth seeing — a GNSS stuck
@@ -97,7 +97,7 @@ panel after a restart and the top box answers it.
 
 ### Monitoring
 
-![The Monitoring tab: per-sensor controls above, the visualisation pane below](docs/img/monitoring.png)
+![The Monitoring tab: per-sensor controls above, the visualisation pane below](.docs/figures/monitoring.png)
 
 Status tells you something is wrong; this is where you do something about it.
 Every sensor gets a row with its live rate and three controls — start, stop,
@@ -119,7 +119,7 @@ they change what the pane says it will show and nothing else.
 
 ### Recording
 
-![The Recording tab: per-sensor switches and the topic count for the next bag](docs/img/recording.png)
+![The Recording tab: per-sensor switches and the topic count for the next bag](.docs/figures/recording.png)
 
 The visualiser used to share this tab; it moved to Monitoring, and recording now
 has the screen to itself. The two still share an exclusive group in the backend,
@@ -235,7 +235,7 @@ the same config file works on the car and on a laptop.
 
 > The two live backends have not yet been run against real sensors. Confirming
 > them against the bag backend on the car is the first task in
-> [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> [.docs/progress.md](.docs/progress.md).
 
 ## Why no dependencies
 
@@ -258,7 +258,7 @@ strict.
 ## Layout of the code
 
 ```
-src/codriver/
+codriver/
   config.py       sensors, processes and commands for this car; the JSON loader
   sensors.py      readings to lights; which red drags its block down
   processes.py    start, watch and Ctrl-C the children; the exclusive groups
@@ -273,9 +273,9 @@ src/codriver/
     mock.py       invented readings
   static/
     index.html    the whole frontend
-instructions/     one <tab-id>.md per tab, opened by the right-hand rail
-examples/         a demo config plus stand-in scripts, for driving it off the car
-docs/img/         the screenshots in this README
+  instructions/   one <tab-id>.md per tab, opened by the right-hand rail
+configs/          a demo config plus stand-in scripts, for driving it off the car
+.docs/            the record: progress.md, related-work.md, figures/
 ```
 
 ## Notes behind the right-hand rail
@@ -412,4 +412,4 @@ codebases that drive it through the same commands a human can click.
 - [ ] have the model emit that config as a structured output, for the setups a
       bag alone cannot describe
 
-The full plan and every open question is in [PROJECT_PLAN.md](PROJECT_PLAN.md).
+The full plan and every open question is in [.docs/progress.md](.docs/progress.md).

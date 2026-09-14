@@ -1,4 +1,4 @@
-"""The sensor registry is the spec of this car, so it gets asserted, not assumed."""
+"""The sensor registry is this car's spec: asserted, not assumed."""
 
 import json
 from pathlib import Path
@@ -19,7 +19,8 @@ def test_camera_registry_matches_the_car() -> None:
     config = default_config()
     cameras = [s for s in config.sensors if s.kind == "camera"]
     assert len(cameras) == 8
-    # Seven have to work; the front-centre fisheye is listed but never required.
+    # Seven have to work; the front-centre fisheye is listed but never
+    # required.
     assert sum(c.critical for c in cameras) == 7
     fisheye = config.sensor("camera_front_center")
     assert fisheye is not None and not fisheye.critical
@@ -74,12 +75,17 @@ def test_pose_pipeline_waits_for_a_ready_marker() -> None:
 def test_operating_mode_commands_point_at_the_script_directory() -> None:
     config = default_config()
     names = {c.name for c in config.commands}
-    assert names == {"om_normal_all", "om_standby_all", "om_normal_bumper", "om_standby_bumper"}
+    assert names == {
+        "om_normal_all",
+        "om_standby_all",
+        "om_normal_bumper",
+        "om_standby_bumper",
+    }
     for command in config.commands:
         assert command.command[0].startswith("~/scripts/")
 
 
-def test_every_default_command_and_process_lives_under_the_script_directory() -> None:
+def test_default_commands_and_processes_live_under_script_dir() -> None:
     config = default_config()
     launched = [c.command[0] for c in config.commands]
     launched += [p.command[0] for p in config.processes if p.name != "rviz"]
@@ -90,7 +96,9 @@ def test_overrides_replace_lists_and_scalars(tmp_path: Path) -> None:
     raw = {
         "ros_backend": "mock",
         "port": 9999,
-        "sensors": [{"name": "only", "kind": "lidar", "topic": "/x", "expected_hz": 10}],
+        "sensors": [
+            {"name": "only", "kind": "lidar", "topic": "/x", "expected_hz": 10}
+        ],
     }
     config = _apply_overrides(default_config(), raw, tmp_path / "c.json")
     assert config.ros_backend == "mock"
@@ -118,7 +126,9 @@ def test_dump_config_round_trips(tmp_path: Path) -> None:
     original = default_config()
     path = tmp_path / "codriver.json"
     path.write_text(dump_config(original))
-    reloaded = _apply_overrides(default_config(), json.loads(path.read_text()), path)
+    reloaded = _apply_overrides(
+        default_config(), json.loads(path.read_text()), path
+    )
     assert reloaded == original
 
 

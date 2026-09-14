@@ -1,10 +1,10 @@
-"""Rate measurement by recording a throwaway bag and counting what landed in it.
+"""Rate measurement: record a throwaway bag, count what landed in it.
 
 This is the method that is already trusted on this car: record for a minute or
 two, then look at the topics of interest. It is the slowest of the backends and
-it writes to disk, but it measures the thing that actually matters, which is
-what a recording would contain, and it cannot be fooled by a QoS mismatch in the
-measuring tool.
+it writes to disk, but it measures the thing that actually matters,
+which is what a recording would contain, and it cannot be fooled by a
+QoS mismatch in the measuring tool.
 
 Kept as the arbiter. When the live probe and this one disagree, this one is the
 ground truth for the question "will the recording have the frames".
@@ -31,7 +31,9 @@ from .backend import RateReading
 _RECORD_STARTUP = 3.0
 
 _DURATION = re.compile(r"Duration:\s*([0-9]+\.?[0-9]*)")
-_TOPIC_ROW = re.compile(r"Topic:\s*(\S+)\s*\|\s*Type:\s*\S+\s*\|\s*Count:\s*(\d+)")
+_TOPIC_ROW = re.compile(
+    r"Topic:\s*(\S+)\s*\|\s*Type:\s*\S+\s*\|\s*Count:\s*(\d+)"
+)
 
 
 class BagBackend:
@@ -45,7 +47,9 @@ class BagBackend:
     def available(self) -> bool:
         return shutil.which("ros2") is not None
 
-    def measure(self, topics: Sequence[str], duration: float) -> dict[str, RateReading]:
+    def measure(
+        self, topics: Sequence[str], duration: float
+    ) -> dict[str, RateReading]:
         if not topics:
             return {}
         parent = self.recordings_dir if self.recordings_dir.is_dir() else None
@@ -59,7 +63,9 @@ class BagBackend:
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
 
-    def _record(self, bag_dir: Path, topics: Sequence[str], duration: float) -> str | None:
+    def _record(
+        self, bag_dir: Path, topics: Sequence[str], duration: float
+    ) -> str | None:
         argv = ["ros2", "bag", "record", "-o", str(bag_dir), *topics]
         try:
             # Own process group, so the interrupt reaches the recorder the same
@@ -83,11 +89,15 @@ class BagBackend:
             proc.kill()
             return "ros2 bag record did not stop"
         if not bag_dir.exists():
-            detail = (stderr or b"").decode("utf-8", "replace").strip().splitlines()
+            detail = (
+                (stderr or b"").decode("utf-8", "replace").strip().splitlines()
+            )
             return detail[-1] if detail else "ros2 bag record produced no bag"
         return None
 
-    def _read_info(self, bag_dir: Path, topics: Sequence[str]) -> dict[str, RateReading]:
+    def _read_info(
+        self, bag_dir: Path, topics: Sequence[str]
+    ) -> dict[str, RateReading]:
         try:
             out = subprocess.run(
                 ["ros2", "bag", "info", str(bag_dir)],
@@ -97,9 +107,14 @@ class BagBackend:
                 check=False,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            return {t: RateReading.missing(t, error=f"ros2 bag info failed: {exc}") for t in topics}
+            return {
+                t: RateReading.missing(t, error=f"ros2 bag info failed: {exc}")
+                for t in topics
+            }
 
-        counts = {name: int(count) for name, count in _TOPIC_ROW.findall(out.stdout)}
+        counts = {
+            name: int(count) for name, count in _TOPIC_ROW.findall(out.stdout)
+        }
         span = _DURATION.search(out.stdout)
         seconds = float(span.group(1)) if span else 0.0
 
@@ -107,9 +122,15 @@ class BagBackend:
         for topic in topics:
             count = counts.get(topic, 0)
             if count == 0:
-                results[topic] = RateReading.missing(topic, error="nothing recorded")
+                results[topic] = RateReading.missing(
+                    topic, error="nothing recorded"
+                )
             elif seconds <= 0:
-                results[topic] = RateReading(topic, present=True, hz=None, samples=count)
+                results[topic] = RateReading(
+                    topic, present=True, hz=None, samples=count
+                )
             else:
-                results[topic] = RateReading(topic, present=True, hz=count / seconds, samples=count)
+                results[topic] = RateReading(
+                    topic, present=True, hz=count / seconds, samples=count
+                )
         return results

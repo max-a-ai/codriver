@@ -63,12 +63,16 @@ class Ros2CliBackend:
     def available(self) -> bool:
         return shutil.which("ros2") is not None
 
-    def measure(self, topics: Sequence[str], duration: float) -> dict[str, RateReading]:
+    def measure(
+        self, topics: Sequence[str], duration: float
+    ) -> dict[str, RateReading]:
         advertised = _topic_list()
         results: dict[str, RateReading] = {}
         for topic in topics:
             if topic not in advertised:
-                results[topic] = RateReading.missing(topic, error="not in `ros2 topic list`")
+                results[topic] = RateReading.missing(
+                    topic, error="not in `ros2 topic list`"
+                )
                 continue
             results[topic] = self._measure_one(topic, duration)
         return results
@@ -76,12 +80,18 @@ class Ros2CliBackend:
     def _measure_one(self, topic: str, duration: float) -> RateReading:
         argv = ["ros2", "topic", "hz", topic]
         if _hz_supports_qos():
-            # Sensor drivers publish best-effort; a reliable subscription simply
-            # never matches them.
-            argv += ["--qos-reliability", "best_effort", "--qos-durability", "volatile"]
+            # Sensor drivers publish best-effort; a reliable subscription
+            # simply never matches them.
+            argv += [
+                "--qos-reliability",
+                "best_effort",
+                "--qos-durability",
+                "volatile",
+            ]
 
         # `ros2 topic hz` never exits on its own, so the timeout is the control
-        # flow: it runs for the window, gets killed, and we read what it printed.
+        # flow: it runs for the window, gets killed, and we read what it
+        # printed.
         try:
             subprocess.run(
                 argv,
@@ -93,9 +103,14 @@ class Ros2CliBackend:
         except subprocess.TimeoutExpired as expired:
             return self._parse(topic, _text(expired.stdout))
         except OSError as exc:
-            return RateReading.missing(topic, error=f"cannot run ros2 topic hz: {exc}")
-        # Exiting early means it gave up, usually "does not appear to be published yet".
-        return RateReading(topic=topic, present=True, hz=None, error="no rate reported")
+            return RateReading.missing(
+                topic, error=f"cannot run ros2 topic hz: {exc}"
+            )
+        # Exiting early means it gave up, usually "does not appear to be
+        # published yet".
+        return RateReading(
+            topic=topic, present=True, hz=None, error="no rate reported"
+        )
 
     def _parse(self, topic: str, stdout: str) -> RateReading:
         rates = _AVERAGE_RATE.findall(stdout)
@@ -106,7 +121,9 @@ class Ros2CliBackend:
                 hz=None,
                 error="publisher advertised but no messages received",
             )
-        return RateReading(topic=topic, present=True, hz=float(rates[-1]), samples=len(rates))
+        return RateReading(
+            topic=topic, present=True, hz=float(rates[-1]), samples=len(rates)
+        )
 
 
 def _text(raw: str | bytes | None) -> str:

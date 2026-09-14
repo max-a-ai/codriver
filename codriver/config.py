@@ -1,9 +1,10 @@
-"""Everything the panel needs to know about this car: sensors, scripts, pipelines.
+"""What the panel knows about this car: sensors, scripts, pipelines.
 
-Nothing in here is discovered at runtime. The vehicle's topic names, script paths
-and launch commands are deployment facts, so they live in one JSON file that can
-be edited on the car without touching the code. The values below are the
-defaults; a config file only has to name the keys it disagrees with.
+Nothing in here is discovered at runtime. The vehicle's topic names,
+script paths and launch commands are deployment facts, so they live in
+one JSON file that can be edited on the car without touching the code.
+The values below are the defaults; a config file only has to name the
+keys it disagrees with.
 
 Lookup order for the config file:
 
@@ -33,23 +34,25 @@ DEFAULT_RATE_TOLERANCE = 0.15
 
 
 def _repo_instructions() -> Path:
-    """The `instructions/` folder in the checkout: one `<tab-id>.md` per tab.
+    """The notes folder: one `<tab-id>.md` per tab.
 
-    Found from the package location first, which covers running from source and
-    an editable install, then from the working directory, which covers being
-    started from the repo root by some other means. If neither exists the first
-    is still returned, and every tab simply reports "no notes yet" rather than
-    the panel refusing to start. `instructions_dir` in the config overrides all
-    of it.
+    It lives inside the package, so it ships with the wheel and is found
+    the same way whether the panel runs from a checkout or an install.
+    The working directory is still checked, which covers someone keeping
+    an edited copy next to wherever they started the panel. If neither
+    exists the first is still returned and every tab reports "no notes
+    yet" rather than the panel refusing to start. `instructions_dir` in
+    the config overrides all of it.
     """
     candidates = [
-        Path(__file__).resolve().parents[2] / "instructions",
+        Path(__file__).resolve().parent / "instructions",
         Path.cwd() / "instructions",
     ]
-    return next((path for path in candidates if path.is_dir()), candidates[0])
+    return next((p for p in candidates if p.is_dir()), candidates[0])
 
 
-#: On the car this is a git clone, so editing a note is a commit like any other.
+#: On the car this is a git clone, so editing a note is a commit like any
+#: other.
 REPO_INSTRUCTIONS = _repo_instructions()
 
 
@@ -61,18 +64,19 @@ class SensorSpec:
     kind: SensorKind
     topic: str
     expected_hz: float
-    #: False for sensors that are wired up and listed but whose failure must not
-    #: colour the whole block red: the front-centre fisheye and the two bumper
-    #: lidars are never recorded, so a bad reading there is noise, not a stop.
+    #: False for sensors that are wired up and listed but whose failure must
+    #: not colour the whole block red: the front-centre fisheye and the two
+    #: bumper lidars are never recorded, so a bad reading there is noise, not a
+    #: stop.
     critical: bool = True
     tolerance: float = DEFAULT_RATE_TOLERANCE
     #: Every topic that goes into the bag when this sensor is switched on for a
     #: recording. A camera is two topics, not one: an `image_raw` without its
     #: `camera_info` is a bag nobody can calibrate afterwards.
     record_topics: tuple[str, ...] = ()
-    #: Recorded whether or not anything is toggled, and not offered as a button.
-    #: The GNSS is the only one: it is small, it is always wanted, and a
-    #: recording that silently lost it is worthless.
+    #: Recorded whether or not anything is toggled, and not offered as a
+    #: button. The GNSS is the only one: it is small, it is always wanted, and
+    #: a recording that silently lost it is worthless.
     always_record: bool = False
 
     def rate_ok(self, measured_hz: float) -> bool:
@@ -103,8 +107,8 @@ class ProcessSpec:
     command: list[str]
     #: Regex matched against the process's own output. Until it matches, the
     #: process reports as "initializing" rather than "running". Pose inference
-    #: loads a large checkpoint and is unusable for the first half minute, and a
-    #: green light during that window is a lie. None means "green once it has
+    #: loads a large checkpoint and is unusable for the first half minute, and
+    #: a green light during that window is a lie. None means "green once it has
     #: survived `ready_after_seconds`".
     ready_pattern: str | None = None
     ready_after_seconds: float = 3.0
@@ -133,15 +137,15 @@ class Config:
     #: "auto" resolves to rclpy when a ROS environment is present, else mock.
     ros_backend: Literal["auto", "mock", "rclpy", "ros2cli", "bag"] = "auto"
     #: Seconds of traffic each rate measurement observes. Two seconds is eight
-    #: frames of the slowest sensor here, enough to tell 10 Hz from 1 Hz without
-    #: making the status tab feel stuck.
+    #: frames of the slowest sensor here, enough to tell 10 Hz from 1 Hz
+    #: without making the status tab feel stuck.
     probe_seconds: float = 2.0
     #: Seconds between automatic sensor sweeps. 0 disables them; the refresh
     #: button still works.
     auto_refresh_seconds: float = 0.0
     recordings_dir: str = "~/recordings"
-    #: One `<tab-id>.md` per tab, opened by the right-hand rail. Defaults to the
-    #: `instructions/` folder in this checkout, so the notes are version
+    #: One `<tab-id>.md` per tab, opened by the right-hand rail. Defaults to
+    #: the `instructions/` folder in this checkout, so the notes are version
     #: controlled and edited like any other file in the repo.
     instructions_dir: str = str(REPO_INSTRUCTIONS)
     log_dir: str = "~/.codriver/logs"
@@ -218,8 +222,8 @@ def _default_sensors() -> list[SensorSpec]:
         for name, critical in _LIDARS
     ]
     # The GNSS comes up at 1 Hz after a computer restart, which is why it gets
-    # its own block in the status tab rather than a row among the lidars. It has
-    # no recording toggle either: it is small and always wanted.
+    # its own block in the status tab rather than a row among the lidars. It
+    # has no recording toggle either: it is small and always wanted.
     sensors.append(
         SensorSpec(
             "gnss",
@@ -336,7 +340,9 @@ def load_config() -> Config:
         if path.is_file():
             return _apply_overrides(base, _read_json(path), path)
         if explicit:
-            raise ConfigError(f"CODRIVER_CONFIG points at {path}, which does not exist")
+            raise ConfigError(
+                f"CODRIVER_CONFIG points at {path}, which does not exist"
+            )
     return base
 
 
@@ -346,7 +352,9 @@ def _read_json(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ConfigError(f"cannot read config {path}: {exc}") from exc
     if not isinstance(raw, dict):
-        raise ConfigError(f"config {path} must contain a JSON object at the top level")
+        raise ConfigError(
+            f"config {path} must contain a JSON object at the top level"
+        )
     return raw
 
 
@@ -371,27 +379,37 @@ def _apply_overrides(base: Config, raw: dict[str, Any], path: Path) -> Config:
     """
     unknown = set(raw) - {*_SCALAR_KEYS, "sensors", "processes", "commands"}
     if unknown:
-        raise ConfigError(f"config {path} has unknown keys: {', '.join(sorted(unknown))}")
+        raise ConfigError(
+            f"config {path} has unknown keys: {', '.join(sorted(unknown))}"
+        )
 
     changes: dict[str, Any] = {k: raw[k] for k in _SCALAR_KEYS if k in raw}
     if "sensors" in raw:
-        changes["sensors"] = [_sensor_from(item, path) for item in _as_list(raw["sensors"], path)]
+        changes["sensors"] = [
+            _sensor_from(item, path) for item in _as_list(raw["sensors"], path)
+        ]
     if "processes" in raw:
         changes["processes"] = [
-            _process_from(item, path) for item in _as_list(raw["processes"], path)
+            _process_from(item, path)
+            for item in _as_list(raw["processes"], path)
         ]
     if "commands" in raw:
         changes["commands"] = [
-            _command_from(item, path) for item in _as_list(raw["commands"], path)
+            _command_from(item, path)
+            for item in _as_list(raw["commands"], path)
         ]
     try:
         return replace(base, **changes)
-    except TypeError as exc:  # pragma: no cover - guarded by the unknown-key check
+    except (
+        TypeError
+    ) as exc:  # pragma: no cover - guarded by the unknown-key check
         raise ConfigError(f"config {path}: {exc}") from exc
 
 
 def _as_list(value: Any, path: Path) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or not all(isinstance(i, dict) for i in value):
+    if not isinstance(value, list) or not all(
+        isinstance(i, dict) for i in value
+    ):
         raise ConfigError(f"config {path}: expected a list of objects")
     return value
 
@@ -413,7 +431,9 @@ def _sensor_from(item: dict[str, Any], path: Path) -> SensorSpec:
     elif isinstance(raw_topics, list):
         record_topics = tuple(str(t) for t in raw_topics)
     else:
-        raise ConfigError(f"config {path}: 'record_topics' must be a list of strings")
+        raise ConfigError(
+            f"config {path}: 'record_topics' must be a list of strings"
+        )
     return SensorSpec(
         name=str(_require(item, "name", path)),
         kind=kind,
@@ -429,7 +449,9 @@ def _sensor_from(item: dict[str, Any], path: Path) -> SensorSpec:
 def _process_from(item: dict[str, Any], path: Path) -> ProcessSpec:
     command = _require(item, "command", path)
     if not isinstance(command, list) or not command:
-        raise ConfigError(f"config {path}: 'command' must be a non-empty list of strings")
+        raise ConfigError(
+            f"config {path}: 'command' must be a non-empty list of strings"
+        )
     return ProcessSpec(
         name=str(_require(item, "name", path)),
         label=str(item.get("label", item["name"])),
@@ -445,7 +467,9 @@ def _process_from(item: dict[str, Any], path: Path) -> ProcessSpec:
 def _command_from(item: dict[str, Any], path: Path) -> CommandSpec:
     command = _require(item, "command", path)
     if not isinstance(command, list) or not command:
-        raise ConfigError(f"config {path}: 'command' must be a non-empty list of strings")
+        raise ConfigError(
+            f"config {path}: 'command' must be a non-empty list of strings"
+        )
     return CommandSpec(
         name=str(_require(item, "name", path)),
         label=str(item.get("label", item["name"])),
@@ -456,7 +480,9 @@ def _command_from(item: dict[str, Any], path: Path) -> CommandSpec:
 
 def dump_config(config: Config) -> str:
     """Serialise a config back to JSON, ready to be edited on the car."""
-    payload: dict[str, Any] = {key: getattr(config, key) for key in _SCALAR_KEYS}
+    payload: dict[str, Any] = {
+        key: getattr(config, key) for key in _SCALAR_KEYS
+    }
     payload["sensors"] = [
         {
             "name": s.name,

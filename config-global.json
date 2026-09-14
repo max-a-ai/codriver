@@ -1,0 +1,16 @@
+{
+  "_comment": "Per-machine paths. Nothing reads this yet; it becomes real when the local model (progress.md L3) and the retrieval index (L2) need machine-dependent locations. Keys starting with _ are documentation.",
+  "project": "codriver",
+  "nas_root": null,
+  "machines": {
+    "_example_workstation": {
+      "workspace": "/home/<user>/Documents/car-ui",
+      "models": "/home/<user>/.ollama/models"
+    }
+  },
+  "workspaces": {},
+  "datasets": {},
+  "checkpoints": {},
+  "methods": {},
+  "smoke": {}
+}

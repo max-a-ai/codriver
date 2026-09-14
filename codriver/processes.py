@@ -95,18 +95,23 @@ class ManagedProcess:
         self._stop_requested = False
         self._detail = ""
         self._exit_code: int | None = None
-        self._pattern = re.compile(spec.ready_pattern) if spec.ready_pattern else None
+        self._pattern = (
+            re.compile(spec.ready_pattern) if spec.ready_pattern else None
+        )
 
     # --- lifecycle ---
 
     def start(
-        self, extra_args: Sequence[str] = (), extra_env: dict[str, str] | None = None
+        self,
+        extra_args: Sequence[str] = (),
+        extra_env: dict[str, str] | None = None,
     ) -> None:
         """Start the child, optionally with arguments decided at click time.
 
-        The recording script gets its topic list this way, both as arguments and
-        as `CODRIVER_TOPICS`, so a script can consume whichever is more convenient
-        without the panel having to know which.
+        The recording script gets its topic list this way, both as
+        arguments and as `CODRIVER_TOPICS`, so a script can consume
+        whichever is more convenient without the panel having to know
+        which.
         """
         with self._lock:
             if self._is_alive():
@@ -126,10 +131,13 @@ class ManagedProcess:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    cwd=os.path.expanduser(self.spec.cwd) if self.spec.cwd else None,
+                    cwd=os.path.expanduser(self.spec.cwd)
+                    if self.spec.cwd
+                    else None,
                     env=env,
-                    # Its own process group, so a stop reaches the whole tree the
-                    # way Ctrl-C would, and so our own SIGINT never reaches it.
+                    # Its own process group, so a stop reaches the whole tree
+                    # the way Ctrl-C would, and so our own SIGINT never reaches
+                    # it.
                     start_new_session=True,
                 )
             except (OSError, ValueError) as exc:
@@ -137,14 +145,19 @@ class ManagedProcess:
                 self._started_at = time.monotonic()
                 self._exit_code = -1
                 self._detail = f"could not start: {exc}"
-                self._append(f"[codriver] could not start {' '.join(command)}: {exc}")
+                self._append(
+                    f"[codriver] could not start {' '.join(command)}: {exc}"
+                )
                 return
             self._started_at = time.monotonic()
             self._append(f"[codriver] started: {' '.join(command)}")
             stream = self._proc.stdout
             if stream is not None:
                 threading.Thread(
-                    target=self._pump, args=(stream,), name=f"log-{self.spec.name}", daemon=True
+                    target=self._pump,
+                    args=(stream,),
+                    name=f"log-{self.spec.name}",
+                    daemon=True,
                 ).start()
 
     def stop(self) -> None:
@@ -166,7 +179,9 @@ class ManagedProcess:
         self._signal_group(proc, signal.SIGKILL)
         self._wait(proc, SIGTERM_GRACE)
 
-    def _signal_group(self, proc: subprocess.Popen[str], sig: signal.Signals) -> None:
+    def _signal_group(
+        self, proc: subprocess.Popen[str], sig: signal.Signals
+    ) -> None:
         # Already gone between the poll and the signal is fine; there is
         # nothing left to stop.
         with contextlib.suppress(OSError, ProcessLookupError):
@@ -187,7 +202,9 @@ class ManagedProcess:
                 for line in stream:
                     text = line.rstrip("\n")
                     self._append(text, sink)
-                    if self._pattern is not None and self._pattern.search(text):
+                    if self._pattern is not None and self._pattern.search(
+                        text
+                    ):
                         self._ready = True
         except (OSError, ValueError):
             # The pipe closed under us; the exit is picked up by status().
@@ -214,7 +231,9 @@ class ManagedProcess:
                 name=self.spec.name,
                 label=self.spec.label,
                 state=state,
-                pid=self._proc.pid if self._is_alive() and self._proc else None,
+                pid=self._proc.pid
+                if self._is_alive() and self._proc
+                else None,
                 started_at=self._started_at,
                 exit_code=exit_code,
                 detail=detail,
@@ -244,8 +263,8 @@ class ManagedProcess:
 
         if self._stop_requested:
             return "idle", "stopped", code
-        # Died on its own. A ready pattern never matching plus an exit is still a
-        # crash, whatever the code says.
+        # Died on its own. A ready pattern never matching plus an exit is still
+        # a crash, whatever the code says.
         return "crashed", f"exited with code {code}", code
 
 
@@ -261,13 +280,17 @@ class ProcessManager:
         return name in self._procs
 
     def start(
-        self, name: str, extra_args: Sequence[str] = (), extra_env: dict[str, str] | None = None
+        self,
+        name: str,
+        extra_args: Sequence[str] = (),
+        extra_env: dict[str, str] | None = None,
     ) -> None:
         spec = self._specs[name]
         holder = self._group_holder(spec.exclusive_group, exclude=name)
         if holder is not None:
             raise ProcessConflictError(
-                f"{self._specs[holder].label} is running; the car cannot do both"
+                f"{self._specs[holder].label} is running; "
+                "the car cannot do both"
             )
         self._procs[name].start(extra_args, extra_env)
 
@@ -277,7 +300,9 @@ class ProcessManager:
     def statuses(self) -> list[ProcessStatus]:
         return [
             self._procs[name].status(
-                blocked_by=self._group_holder(spec.exclusive_group, exclude=name)
+                blocked_by=self._group_holder(
+                    spec.exclusive_group, exclude=name
+                )
             )
             for name, spec in self._specs.items()
         ]
@@ -318,9 +343,13 @@ def run_command(spec: CommandSpec, timeout: float = 60.0) -> CommandResult:
             check=False,
         )
     except subprocess.TimeoutExpired:
-        return CommandResult(spec.name, 124, f"timed out after {timeout:.0f}s", timeout)
+        return CommandResult(
+            spec.name, 124, f"timed out after {timeout:.0f}s", timeout
+        )
     except OSError as exc:
-        return CommandResult(spec.name, 127, f"could not run {command[0]}: {exc}", 0.0)
+        return CommandResult(
+            spec.name, 127, f"could not run {command[0]}: {exc}", 0.0
+        )
     output = (completed.stdout or "") + (completed.stderr or "")
     return CommandResult(
         spec.name,

@@ -9,8 +9,9 @@ Criticality does not change a sensor's own colour, only whether it drags its
 block down with it. The front-centre fisheye and the two bumper lidars are
 listed because they exist, not because a demo waits on them.
 
-The GNSS is the reason a rate check is worth building. It comes up at 1 Hz after
-the computer is restarted and stays there until somebody sets it; once set it
+The GNSS is the reason a rate check is worth building. It comes up at
+1 Hz after a computer restart and stays there until somebody sets it;
+once set it
 holds for the rest of the session. So there is exactly one moment where it is
 wrong, right at the start, which is the moment nobody is looking.
 """
@@ -74,7 +75,11 @@ def _verdict(
         return "bad", None, reading.error or "publishing nothing"
     if spec.rate_ok(reading.hz):
         return "ok", reading.hz, ""
-    return "bad", reading.hz, f"{reading.hz:.1f} Hz, expected {spec.expected_hz:.0f} Hz"
+    return (
+        "bad",
+        reading.hz,
+        f"{reading.hz:.1f} Hz, expected {spec.expected_hz:.0f} Hz",
+    )
 
 
 def evaluate(spec: SensorSpec, reading: RateReading | None) -> SensorStatus:
@@ -145,7 +150,9 @@ class SensorMonitor:
             if self._sweeping:
                 return False
             self._sweeping = True
-        threading.Thread(target=self._sweep, name="sensor-sweep", daemon=True).start()
+        threading.Thread(
+            target=self._sweep, name="sensor-sweep", daemon=True
+        ).start()
         return True
 
     def _sweep(self) -> None:
@@ -172,7 +179,9 @@ class SensorMonitor:
             while not self._stop.wait(self.config.auto_refresh_seconds):
                 self.refresh_async()
 
-        self._timer = threading.Thread(target=loop, name="sensor-auto", daemon=True)
+        self._timer = threading.Thread(
+            target=loop, name="sensor-auto", daemon=True
+        )
         self._timer.start()
 
     def shutdown(self) -> None:
@@ -190,5 +199,8 @@ class SensorMonitor:
                 "probe_seconds": self.config.probe_seconds,
                 "error": self._error,
             }
-        statuses = [evaluate(spec, readings.get(spec.topic)) for spec in self.config.sensors]
+        statuses = [
+            evaluate(spec, readings.get(spec.topic))
+            for spec in self.config.sensors
+        ]
         return group_into_blocks(statuses), meta

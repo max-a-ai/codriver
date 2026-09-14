@@ -16,15 +16,16 @@ class RateReading:
     """What one probe learned about one topic."""
 
     topic: str
-    #: A publisher for this topic exists. False means nothing is advertising it,
-    #: which reads as "the sensor is off or its driver died" rather than "slow".
+    #: A publisher for this topic exists. False means nothing is advertising
+    #: it, which reads as "the sensor is off or its driver died" rather than
+    #: "slow".
     present: bool
     #: Measured publish rate. None when no rate could be established, either
-    #: because the topic is absent or because too few messages arrived to divide
-    #: by an interval.
+    #: because the topic is absent or because too few messages arrived to
+    #: divide by an interval.
     hz: float | None
-    #: Messages seen during the window. Useful for telling "one message, no rate"
-    #: apart from "silence".
+    #: Messages seen during the window. Useful for telling "one message, no
+    #: rate" apart from "silence".
     samples: int = 0
     error: str | None = None
 
@@ -42,15 +43,22 @@ class RateBackend(Protocol):
     def available(self) -> bool:
         """Whether this backend can run here at all."""
 
-    def measure(self, topics: Sequence[str], duration: float) -> dict[str, RateReading]:
-        """Observe every topic for `duration` seconds. One reading per topic."""
+    def measure(
+        self, topics: Sequence[str], duration: float
+    ) -> dict[str, RateReading]:
+        """Observe every topic for `duration` seconds.
+
+        One reading per topic.
+        """
 
 
 def ros_environment_present() -> bool:
     """A sourced ROS 2 environment, near enough. ROS_DISTRO is set by every
     `setup.bash`, and `ros2` on PATH rules out a stale variable in a shell that
     never had the install."""
-    return bool(os.environ.get("ROS_DISTRO")) and shutil.which("ros2") is not None
+    return (
+        bool(os.environ.get("ROS_DISTRO")) and shutil.which("ros2") is not None
+    )
 
 
 def resolve_backend(config: Config) -> RateBackend:
