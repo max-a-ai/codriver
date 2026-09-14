@@ -117,19 +117,59 @@ closest prior work the rest of this document may need revising.
 | Action space | ROS API | configurable policy | none | **exactly the UI's buttons** |
 | Adapts to a new rig | live introspection | affordance discovery | n/a | **from a rosbag** |
 
+### Settled 2026-09-14
+
+**Read broadly, act narrowly.** The model may *read* anything in the
+background — the live graph, the repo, the logs — but may only *act*
+through the panel's own actions. That asymmetry is the design, and it is
+what separates claim 1 from ROSClaw's configurable safety policy: the
+write surface is not a policy you have to trust, it is a screen you are
+already looking at.
+
+**The two-touch rule.** Anything the panel can do is reachable in at
+most two touches: pick the tab, press the thing. Three at worst if a
+scroll is needed, which is a resolution problem rather than a design
+one. Settings are explicitly out of scope — they are done with the
+vehicle stationary.
+
+This is the sharpest version of claim 1, because it is *measurable* and
+it binds the two halves together: **the LLM's entire action space is the
+set of things a human can reach in two touches.** Neither ROSA nor
+ROSClaw can state their action space that compactly, because theirs is
+the ROS API and a policy file respectively.
+
+### The experiment
+
+An ablation, not a demo: **the same commands, the same models, with and
+without the codebase RAG**, scored on whether the correct action was
+executed. Across several models, so the result is about the retrieval
+and not about one model's priors.
+
+That tests claim 2 directly, and it answers the question ROSClaw's 4.8×
+spread raises — how much of correct behaviour is the model versus the
+scaffolding. Our answer would be "this much of it is the corpus".
+
+Open: the command set to score against, how many models, and who writes
+the ground truth.
+
+---
+
 Three claims survive contact with this literature:
 
 1. **The UI is the contract, not a chat window.** In all three systems
    language is the interface. Here the panel is the artifact and language
    is a second channel onto the *same* actions. Nothing the model can do
    is invisible to somebody watching the screen, and every model action
-   has a button that does the identical thing. This is the strongest
-   card and it is an HCI claim, not a robotics one.
-2. **Retrieval grounded in one vehicle's own repository.** Not general
-   ROS documentation and not loose PDFs: the launch files, configs, URDF,
-   scripts and notes of *this* rig, because every sensor-mounted vehicle
-   is a one-off. ros2_rag has the machinery but points it at generic
-   documents; ROSA and ROSClaw read the live graph but not the source.
+   has a button that does the identical thing — reachable in two touches.
+   The model reads widely and acts narrowly. This is the strongest card
+   and it is an HCI claim, not a robotics one.
+2. **Retrieval grounded in one vehicle's own repository.** The corpus is
+   the stack actually running on the rig — Autoware, or the hand-written
+   ROS stack of that sensor mount — plus the instruction files. Not
+   general ROS documentation and not loose PDFs, because every
+   sensor-mounted vehicle is a one-off. ros2_rag has the machinery but
+   points it at generic documents; ROSA and ROSClaw read the live graph
+   but not the source.
 3. **Automatic adaptation to a new sensor mount from a recording.**
    Deriving the panel — sensors, expected rates, topic groups — from a
    reference rosbag's `metadata.yaml` is the concrete mechanism behind

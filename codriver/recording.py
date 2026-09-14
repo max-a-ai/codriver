@@ -108,6 +108,11 @@ class RecordingSelection:
 
     # --- output ---
 
+    def selected(self) -> set[str]:
+        """The switched-on sensor names, for diffing a toggle against."""
+        with self._lock:
+            return set(self._selected)
+
     def topics(self) -> list[str]:
         """Every topic the next recording should contain, in registry order and
         without duplicates."""

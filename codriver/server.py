@@ -135,6 +135,29 @@ class PanelHandler(BaseHTTPRequestHandler):
     def _command(self, match: re.Match[str]) -> Any:
         return self.app.run(match.group(1))
 
+    @_post(r"/api/terminal")
+    def _terminal(self, _match: re.Match[str]) -> Any:
+        return self.app.say(self._json_body().get("text", ""))
+
+    def _json_body(self) -> dict[str, Any]:
+        """The request body, or an empty dict when there is not one.
+
+        A malformed body is an empty dict rather than a 500: the caller
+        is a text box, and the useful answer is "I did not understand
+        that" rather than a stack trace.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return {}
+        if length <= 0:
+            return {}
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except (ValueError, OSError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
     # --- transport ---
 
     def _send_json(self, payload: Any, status: int = 200) -> None:

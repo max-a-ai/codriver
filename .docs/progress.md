@@ -47,6 +47,16 @@ gantt
 
 ## Panel
 
+- **2026-09-14** — **Terminal built** (P4). An event log in the backend
+  (`codriver/events.py`), written by every action — toggles, process
+  start/stop, commands, and sensors going red — and exposed in
+  `/api/state`. Every event carries `source`, so a click and a model
+  action are distinguishable in the same stream, which is what makes the
+  paper's first claim checkable rather than asserted. The frontend shows
+  it as a bar across the bottom of every tab, collapsed to one line,
+  opening to a log grouped by tab plus a text input. `POST /api/terminal`
+  accepts a typed line and answers that the language layer is not
+  connected — the path exists end to end. 9 new tests.
 - **2026-09-14** — Repo moved to the standard layout: flat `codriver/`
   package (no `src/`), hatchling instead of `uv_build`, line length 79,
   `.docs/` tree, `configs/`, `notebooks/`, `third_party/`, HANDOFF and
@@ -159,9 +169,27 @@ gantt
       **Needs a decision:** does editing a role write straight to disk or
       need a save step? Is `ignore` per profile, or also global?
 
-- [ ] **P4 A terminal in the UI.** Both the missing output view and the
-      typed half of the natural-language input, so it is one piece of
-      work rather than two.
+- [ ] **P4 A terminal in the UI.** Both halves: the typed end of the
+      natural-language input, and an activity log of everything that
+      happened — grouped by the tab it belongs to, and carrying human
+      clicks and model actions in the *same* stream. That shared stream
+      is what makes "nothing the model does is invisible" true rather
+      than asserted, so it is evidence for the paper's first claim, not
+      just a feature.
+
+      ```
+      -------------------------------------------------
+      Recording
+          activated   camera_front_center
+          deactivated camera_front_left
+      -------------------------------------------------
+      Monitoring
+          visualising lidar_roof_top
+      -------------------------------------------------
+      Status
+          XXX camera_front_center        (when it goes red)
+      -------------------------------------------------
+      ```
 - [ ] **P5 An error terminal along the bottom of Status.** The other half
       of making Status the screen you read.
 - [ ] **P6 A bigger, red, unmistakable record button.**
@@ -177,7 +205,10 @@ gantt
       60 s next to the live numbers, for when the trustworthy answer
       matters more than the fast one.
 - [ ] **P12 Wire the per-sensor start / stop / visualise buttons.**
-      Disabled placeholders today; needs per-sensor launch files.
+      Disabled placeholders today. **Sensors are containers**, so start
+      and stop go through a Portainer-style container API rather than
+      launch files — one container per sensor, the way William's setup
+      does it. Needs the container names and the endpoint.
 - [ ] **P13 Embedded visualisation.** Foxglove is the only one of the two
       that can render inside a browser page: `foxglove_bridge` is a
       WebSocket a browser can consume, and Studio can be self-hosted in
@@ -185,6 +216,12 @@ gantt
       screen-streamed over noVNC or WebRTC. Measure the bridge's latency
       rather than treating the two as equivalent.
 - [ ] **P14 Leave room for a Control tab**, for closed-loop operation.
+- [ ] **P17 Hold the two-touch rule.** Every action reachable in at most
+      two touches — pick the tab, press the thing — with a scroll
+      tolerated as a third. Settings are out of scope; they are done with
+      the vehicle stationary. This is a stated contribution now, so it
+      needs auditing whenever a control moves. Known cost: collapsing the
+      visualisation pane put starting the visualiser at three touches.
 - [ ] **P15 Fill `codriver/instructions/*.md`** with the real procedures
       from the car computer.
 - [ ] **P16 Add a LICENSE.** The repo is public and will back a paper;
@@ -225,16 +262,20 @@ vehicle.
 
 - [ ] **L1 Finish the related-work review** and write the positioning
       paragraph. See [related-work.md](related-work.md).
-- [ ] **L2 RAG over the vehicle's own repository.** The claim to defend:
-      every sensor-mounted vehicle is a one-off, so the retrieval corpus
-      is *this* vehicle's launch files, configs, URDF, scripts and notes,
-      not general ROS documentation.
+- [ ] **L2 RAG over the vehicle's own repository.** The corpus is the
+      stack actually running on the rig — **Autoware, or the hand-written
+      ROS stack of that sensor mount** — plus the instruction files. Not
+      general ROS documentation. The claim to defend: every
+      sensor-mounted vehicle is a one-off, so the corpus has to be this
+      one's source.
 - [ ] **L3 A local model.** Ollama, small Qwen. Runs on the car compute
       with no network.
-- [ ] **L4 MCP bound to the panel's own actions.** The model may call
-      exactly what a person can click — start/stop a sensor, a recording,
-      a pipeline, and the recording switches — and nothing else. The
-      panel's existing API is the whole tool surface.
+- [ ] **L4 MCP bound to the panel's own actions.** **Read broadly, act
+      narrowly**: the model may read anything in the background — the
+      live graph, the repo, the logs — but may only *act* through what a
+      person can click: start/stop a sensor, a recording, a pipeline, and
+      the recording switches. The panel's existing API is the whole write
+      surface, and it is small enough that the simple version suffices.
 - [ ] **L5 Fold the per-tab notes into the retrieval corpus**, so the
       right rail becomes a question you can ask rather than a file you
       open.
@@ -253,9 +294,12 @@ vehicle.
 
 - [ ] **W1 Positioning against the four systems** in
       [related-work.md](related-work.md).
-- [ ] **W2 Decide the evaluation.** What claim is being tested, and with
-      what — task completion time against a terminal, error rate,
-      something with real users?
+- [ ] **W2 The experiment: a RAG ablation.** Same commands, same models,
+      **with and without the codebase RAG**, scored on whether the
+      correct action was executed. Several models, so the result is about
+      the retrieval rather than one model's priors. Still open: the
+      command set to score against, how many models, and who writes the
+      ground truth.
 - [ ] **W3 Confirm the HCII deadline** and fix the timetable dates.
 
 ---
